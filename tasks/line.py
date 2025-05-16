@@ -67,5 +67,5 @@ if __name__ == "__main__":
     
     print("Created instances:", instances)
     cleanHostsBeforeInsert(args.task_type)
-    save_info(instances,task_type=args.task_type)
+    save_info(instances,args.task_type,True)
     printFile("/etc/hosts")

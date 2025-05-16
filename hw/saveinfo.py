@@ -1,6 +1,7 @@
 import re
 import subprocess
 import os
+import time
 
 def is_root():
     """检查当前用户是否是root用户"""
@@ -11,7 +12,7 @@ def cleanHostsBeforeInsert(task_type):
     清理 /etc/hosts 中所有 node{数字}_{task_type} 的条目
     """
     hosts_file = '/etc/hosts'
-    pattern = re.compile(r'\b(node\d+_{})\b'.format(re.escape(task_type)))  # 匹配 node 后跟数字和指定任务类型的单词
+    pattern = re.compile(r'\b(node\d+-{})\b'.format(re.escape(task_type)))  # 匹配 node 后跟数字和指定任务类型的单词
     
     print("\n=== Before modification ===")
     printFile(hosts_file)
@@ -74,20 +75,42 @@ def printFile(path):
             print(f"Error reading {path}: {result.stderr}")
     except Exception as e:
         print(f"Error: {e}")
+    
+# 使用 ssh-keyscan 将节点主机名添加到 known_hosts
+def add_to_known_hosts(hostname, retries=10, delay=5):
+    ssh_dir = os.path.expanduser("~/.ssh")
+    os.makedirs(ssh_dir, exist_ok=True)
+    # 确保 known_hosts 文件存在
+    known_hosts_path = os.path.join(ssh_dir, "known_hosts")
+    for attempt in range(retries):
+        try:
+            # 执行 ssh-keyscan 命令并追加到 known_hosts 文件
+            subprocess.run(f'ssh-keyscan -H {hostname} >> {known_hosts_path}', shell=True, check=True)
+            print(f'Added {hostname} to known_hosts.')
+            return  # 成功后退出函数
+        except subprocess.CalledProcessError as e:
+            if attempt < retries - 1:  # 如果不是最后一次尝试
+                print(f'Retrying in {delay} seconds...')
+                time.sleep(delay)  # 等待指定的时间后重试
+    print(f'Failed to add {hostname} to known_hosts after {retries} attempts.')
 
-def save_info(instances, task_type):
+
+def save_info(instances,task_type,is_public):
     fileName = task_type + "_nodes_info.txt"
     # 保存节点信息到一个文件，包含 Public IP 地址
     with open(f'./cache/{fileName}', 'w') as f:
         for instance in instances:
             # 保存节点信息到文件，每一行格式为：node{index} {Public IP} {server_id} {private_ip}
-            f.write(f'node{instance[0]}_{task_type} {instance[1]} {instance[2]} {instance[3]}\n')
+            f.write(f'node{instance[0]}-{task_type} {instance[1]} {instance[2]} {instance[3]}\n')
             
             # 根据是否 root 决定是否添加 sudo
             sudo_prefix = "" if is_root() else "sudo "
-            command = f"echo '{instance[3]} node{instance[0]}_{task_type}' | {sudo_prefix}tee -a /etc/hosts"
-            
+            ip = instance[1] if is_public else instance[3]
+            command = f"echo '{ip} node{instance[0]}-{task_type}' | {sudo_prefix}tee -a /etc/hosts"
             # 执行命令
             subprocess.run(command, shell=True, check=True)
+            add_to_known_hosts(f"node{instance[0]}-{task_type}")
             
     print(f'Node information with Public IPs has been saved to {fileName}')
+    
+    

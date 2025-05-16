@@ -24,6 +24,8 @@ test_login:
 	python hw/fabricLogin.py --host ${MASTER} --key_path ${HW_SDK_KEYPEM}.pem --user root
 start_container:
 	docker run -it --name temp_schedule -v ./:/mnt/schedule ubuntu:22.04 /bin/bash
+use_container:
+	docker exec -it temp_schedule /bin/bash
 delete_container:
 	docker stop temp_schedule
 	docker rm temp_schedule
@@ -40,3 +42,5 @@ line:
 		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
 		--actor alice \
 		--use-ip true
+login:
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@${MASTER}
