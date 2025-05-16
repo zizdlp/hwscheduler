@@ -44,7 +44,7 @@ def create_hw_instances(ak, sk, vpc_id, instance_index, region, instance_type, i
             publicip = PostPaidServerPublicip(id=origin_publicip.id, delete_on_termination=True)
         
         user_data_script = '''#cloud-config
-hostname: node{0}'''.format(instance_index)
+hostname: node{0}_{1}'''.format(instance_index,task_type)
         user_data = base64.b64encode(user_data_script.encode('utf-8')).decode('utf-8')
      
         server_tags = [

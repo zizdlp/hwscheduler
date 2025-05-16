@@ -2,9 +2,9 @@
 import sys
 sys.path.append("/mnt/schedule")  # Add the project root to the path
 from hw.createEIP import create_eip
-from hw.saveInfo import save_info
+from hw.saveInfo import save_info,cleanHostsBeforeInsert
 from hw.createInstance import parallel_create_instances
-
+from hw.saveInfo import printFile
 import argparse
 import time
 import base64
@@ -66,4 +66,6 @@ if __name__ == "__main__":
     )
     
     print("Created instances:", instances)
+    cleanHostsBeforeInsert(args.task_type)
     save_info(instances,task_type=args.task_type)
+    printFile("/etc/hosts")
