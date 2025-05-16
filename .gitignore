@@ -1,0 +1,4 @@
+.env
+*.pem
+cache/
+__pycache__/
