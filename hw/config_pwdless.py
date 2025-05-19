@@ -1,10 +1,8 @@
 from fabric import Connection
-from io import StringIO
-import argparse
 from concurrent.futures import ThreadPoolExecutor
 import os
 import subprocess
-
+import argparse
 
 def generate_ssh_key_locally(key_path="~/.ssh/cluster_key"):
     """
@@ -41,6 +39,7 @@ def generate_ssh_key_locally(key_path="~/.ssh/cluster_key"):
     with open(public_key, 'r') as f:
         public_key_content = f.read().strip()
     return private_key, public_key_content
+
 def read_cluster_info_file(file_path):
     """
     读取集群信息文件，并将其转换为字典列表。
@@ -102,6 +101,7 @@ def clean_and_update_hosts(conn, nodes):
     
     # 验证更新
     conn.run("cat /etc/hosts")
+
 def configure_node(node, initial_key_path, user, nodes, private_key):
     """
     配置单个节点，上传私钥和公钥，配置authorized_keys，配置/etc/hosts和SSH客户端
@@ -154,12 +154,10 @@ Host *
     except Exception as e:
         print(f"Error configuring node {node['hostname']}: {e}")
         return False
-if __name__ == "__main__":
-    cluster_info_file = "./cache/spark_nodes_info.txt"
+
+def configure_pwdless(cluster_info,key_path,user):
     local_key_path = "/root/.ssh/cluster_key"
-    nodes = read_cluster_info_file(cluster_info_file)
-    initial_key_path = "KeyPair-loacl.pem"
-    user = "root"
+    nodes = read_cluster_info_file(cluster_info)
     
     if not nodes:
         print("No nodes found in cluster info file. Exiting.")
@@ -173,15 +171,13 @@ if __name__ == "__main__":
     print("=== Generating SSH key pair on local machine ===")
     local_private_key_path, public_key_content = generate_ssh_key_locally(local_key_path)
     
-    print("local path:",local_private_key_path)
-    
     
     
     with ThreadPoolExecutor(max_workers=len(nodes)) as executor:
         futures = []
         for node in nodes:
             futures.append(executor.submit(
-                configure_node, node, initial_key_path, user, nodes,local_private_key_path
+                configure_node, node, key_path, user, nodes,local_private_key_path
             ))
         
         # Wait for all tasks to complete and collect results
@@ -196,3 +192,12 @@ if __name__ == "__main__":
             for i, result in enumerate(results):
                 if not result:
                     print(f"  {nodes[i]['hostname']}")
+    
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='配置集群免密登陆')
+    parser.add_argument('--cluster-info', required=True, help='集群配置信息文件路径')
+    parser.add_argument('--key-path', required=True, help='登陆集群密钥文件路径')
+    parser.add_argument('--user', default='root', help='The username to connect as (default: root).')
+    args = parser.parse_args()
+    configure_pwdless(args.cluster_info,args.key_path,args.user)
+    

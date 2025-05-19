@@ -37,13 +37,15 @@ line:
 		--instance-type kc1.large.4 \
 		--instance-zone ap-southeast-3a \
 		--ami 04b5ea14-da35-47de-8467-66808dd62007 \
+		--task-type "welldone" \
 		--key-pair ${HW_SDK_KEYPEM} \
 		--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
 		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
 		--actor alice \
-		--use-ip true
+		--use-ip true 
+
 login:
 	ssh -i ${HW_SDK_KEYPEM}.pem  root@node0-spark
 pwd_less:
-	python3 hw/pwdless.py --hosts node1-spark node2-spark node3-spark --key_path ${HW_SDK_KEYPEM}.pem  --user root --local_key /root/.ssh/cluster_key
+	python3 hw/config_pwdless.py --cluster-info "./cache/spark_nodes_info.txt"  --key_path ${HW_SDK_KEYPEM}.pem
 

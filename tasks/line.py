@@ -6,12 +6,7 @@ from hw.saveInfo import save_info,cleanHostsBeforeInsert
 from hw.createInstance import parallel_create_instances
 from hw.saveInfo import printFile
 import argparse
-import time
-import base64
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from huaweicloudsdkcore.auth.credentials import BasicCredentials
-from huaweicloudsdkecs.v2.region.ecs_region import EcsRegion
-from huaweicloudsdkcore.exceptions import exceptions
+from hw.config_pwdless import configure_pwdless
 from huaweicloudsdkecs.v2 import *
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='DEMO')
@@ -32,7 +27,6 @@ if __name__ == "__main__":
                        default="6308b01a-0e7a-413a-96e2-07a3e507c324", help='Security group ID')
     parser.add_argument('--subnet-id', type=str, 
                        default="6a19704d-f0cf-4e10-a5df-4bd947b33ffc", help='Subnet ID')
-    
     # Optional parameters
     parser.add_argument('--use-nvme', type=bool, default=True, help='Whether to use NVMe')
     parser.add_argument('--run-number', type=str, default="0", help='Run number identifier')
@@ -41,7 +35,7 @@ if __name__ == "__main__":
     parser.add_argument('--actor', type=str, help='User who triggered the creation')
     parser.add_argument('--use-spot', type=str, default="true", help='Whether to use spot instances')
     parser.add_argument('--use-ip', type=str, default="true", help='Whether to assign public IP')
-    
+    parser.add_argument('--user', default='root', help='The username to connect as (default: root).')
     args = parser.parse_args()
     
     instances = parallel_create_instances(
@@ -69,3 +63,6 @@ if __name__ == "__main__":
     cleanHostsBeforeInsert(args.task_type)
     save_info(instances,args.task_type,True)
     printFile("/etc/hosts")
+    key_path = args.key_pair+".pem"
+    cluster_info= "./cache/"+args.task_type+"_nodes_info.txt"
+    configure_pwdless(cluster_info,key_path,args.user)
