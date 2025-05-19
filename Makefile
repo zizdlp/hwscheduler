@@ -43,4 +43,7 @@ line:
 		--actor alice \
 		--use-ip true
 login:
-	ssh -i ${HW_SDK_KEYPEM}.pem  root@${MASTER}
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@node0-spark
+pwd_less:
+	python3 hw/pwdless.py --hosts node1-spark node2-spark node3-spark --key_path ${HW_SDK_KEYPEM}.pem  --user root --local_key /root/.ssh/cluster_key
+
