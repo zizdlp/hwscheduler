@@ -32,7 +32,7 @@ def create_eip(ak, sk, region, task_name):
             print("EIP Address:", pub.public_ip_address)
             
             # Write to file
-            filename = f"./cache/{args.task}_ip_info.txt"
+            filename = f"./cache/{task_name}_ip_info.txt"
             with open(filename, 'w') as f:
                 f.write(f"{pub.id}\t{pub.public_ip_address}\n")
             
