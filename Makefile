@@ -51,7 +51,7 @@ task_build_chukonu:
 		--instance-type kc1.large.4 \
 		--instance-zone ap-southeast-3a \
 		--ami 27164e55-d72c-4611-8c74-3e4227197cae \
-		--task-type "build-chukonu" \
+		--task-type "build-chukonu-as" \
 		--key-pair ${HW_SDK_KEYPEM} \
 		--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
 		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \

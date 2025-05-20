@@ -2,7 +2,7 @@ import re
 import subprocess
 import os
 import time
-
+import socket
 def is_root():
     """检查当前用户是否是root用户"""
     return os.geteuid() == 0
@@ -80,20 +80,49 @@ def printFile(path):
 def add_to_known_hosts(hostname, retries=20, delay=5):
     ssh_dir = os.path.expanduser("~/.ssh")
     os.makedirs(ssh_dir, exist_ok=True)
-    # 确保 known_hosts 文件存在
+    
+    # 确保 known_hosts 文件存在且权限正确
     known_hosts_path = os.path.join(ssh_dir, "known_hosts")
+    if not os.path.exists(known_hosts_path):
+        open(known_hosts_path, 'a').close()
+    os.chmod(known_hosts_path, 0o600)
+    
     for attempt in range(retries):
         try:
-            # 执行 ssh-keyscan 命令并追加到 known_hosts 文件
-            subprocess.run(f'ssh-keyscan -H {hostname} >> {known_hosts_path}', shell=True, check=True)
-            print(f'Added {hostname} to known_hosts.')
-            return  # 成功后退出函数
-        except subprocess.CalledProcessError as e:
-            if attempt < retries - 1:  # 如果不是最后一次尝试
-                print(f'Retrying in {delay} seconds...')
-                time.sleep(delay)  # 等待指定的时间后重试
+            # 先检查主机名是否能解析（避免直接调用 ssh-keyscan 失败）
+            try:
+                socket.gethostbyname(hostname)
+            except socket.gaierror:
+                print(f"DNS resolution failed for {hostname}, retrying...")
+                time.sleep(delay)
+                continue
+            
+            # 执行 ssh-keyscan 并验证输出
+            result = subprocess.run(
+                f'ssh-keyscan -H {hostname}',
+                shell=True,
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            
+            if not result.stdout.strip():
+                raise subprocess.CalledProcessError(1, 'ssh-keyscan', "Empty output")
+            
+            # 追加到 known_hosts
+            with open(known_hosts_path, 'a') as f:
+                f.write(result.stdout)
+            
+            print(f'Successfully added {hostname} to known_hosts.')
+            return
+            
+        except (subprocess.CalledProcessError, socket.gaierror) as e:
+            print(f'Attempt {attempt + 1}/{retries} failed: {str(e)}')
+            if attempt < retries - 1:
+                time.sleep(delay)
+    
     print(f'Failed to add {hostname} to known_hosts after {retries} attempts.')
-
+    raise RuntimeError("Max retries exceeded")
 
 def save_info(instances,task_type,is_public):
     fileName = task_type + "_nodes_info.txt"

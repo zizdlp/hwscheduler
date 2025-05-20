@@ -54,9 +54,11 @@ hostname: node{0}-{1}'''.format(instance_index,task_type)
             PostPaidServerTag(key="WarningHours", value=timeout_hours),
             PostPaidServerTag(key="Actor", value=actor)
         ]
-        # 计算6小时后的UTC时间戳
+        
+        # 计算6小时后的UTC时间，并格式化为 yyyy-MM-ddTHH:mm:ssZ
         terminate_time = datetime.utcnow() + timedelta(hours=int(timeout_hours))
-        terminate_timestamp = int(time.mktime(terminate_time.timetuple()))
+        terminate_time_str = terminate_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        
         name = f"{run_number}-{task_type}-node{instance_index}-timeout{timeout_hours}-{actor}"
         serverbody = PostPaidServer(
             flavor_ref=instance_type,
@@ -71,7 +73,9 @@ hostname: node{0}-{1}'''.format(instance_index,task_type)
             user_data=user_data,
             server_tags=server_tags,
             availability_zone=instance_zone,
-            auto_terminate_time=str(terminate_timestamp)
+            metadata={
+                '__auto_terminate_time': terminate_time_str  # 使用正确的格式
+            }
         )
         
         request.body = CreatePostPaidServersRequestBody(
