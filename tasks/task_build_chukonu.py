@@ -74,5 +74,5 @@ if __name__ == "__main__":
     test_build_chukonu(master_node['hostname'],key_path, args.user)
     
     server_ids=[ServerId(id=node['server_id']) for node in nodes]
-    delete_servers(server_ids,args.region,args.ak,args.sk)
+    # delete_servers(server_ids,args.region,args.ak,args.sk)
     

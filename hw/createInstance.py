@@ -9,7 +9,8 @@ from huaweicloudsdkecs.v2.region.ecs_region import EcsRegion
 from huaweicloudsdkcore.exceptions import exceptions
 from huaweicloudsdkecs.v2 import *
 from .createEIP import create_eip
-
+from datetime import datetime, timedelta
+import time
 def create_hw_instances(ak, sk, vpc_id, instance_index, region, instance_type, instance_zone, ami, key_pair, 
                        security_group_id, subnet_id, use_nvme, run_number, task_type, timeout_hours, 
                        actor, use_spot, use_ip):
@@ -53,7 +54,9 @@ hostname: node{0}-{1}'''.format(instance_index,task_type)
             PostPaidServerTag(key="WarningHours", value=timeout_hours),
             PostPaidServerTag(key="Actor", value=actor)
         ]
-        
+        # 计算6小时后的UTC时间戳
+        terminate_time = datetime.utcnow() + timedelta(hours=int(timeout_hours))
+        terminate_timestamp = int(time.mktime(terminate_time.timetuple()))
         name = f"{run_number}-{task_type}-node{instance_index}-timeout{timeout_hours}-{actor}"
         serverbody = PostPaidServer(
             flavor_ref=instance_type,
@@ -68,6 +71,7 @@ hostname: node{0}-{1}'''.format(instance_index,task_type)
             user_data=user_data,
             server_tags=server_tags,
             availability_zone=instance_zone,
+            auto_terminate_time=str(terminate_timestamp)
         )
         
         request.body = CreatePostPaidServersRequestBody(
