@@ -73,9 +73,7 @@ hostname: node{0}-{1}'''.format(instance_index,task_type)
             user_data=user_data,
             server_tags=server_tags,
             availability_zone=instance_zone,
-            metadata={
-                '__auto_terminate_time': terminate_time_str  # 使用正确的格式
-            }
+            auto_terminate_time=terminate_time_str
         )
         
         request.body = CreatePostPaidServersRequestBody(

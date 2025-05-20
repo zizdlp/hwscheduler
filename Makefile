@@ -2,7 +2,7 @@ include .env
 permission:
 	chmod 400 ${HW_SDK_KEYPEM}.pem
 createEIP:
-	python hw/createEIP.py --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION}
+	python3 hw/createEIP.py --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --task "alice-to"
 createServerGroup:
 	python3 hw/createInstance.py \
 	 	--ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} \
@@ -51,7 +51,7 @@ task_build_chukonu:
 		--instance-type kc1.large.4 \
 		--instance-zone ap-southeast-3a \
 		--ami 27164e55-d72c-4611-8c74-3e4227197cae \
-		--task-type "build-chukonu-as" \
+		--task-type "build-chukonu-asb" \
 		--key-pair ${HW_SDK_KEYPEM} \
 		--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
 		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
@@ -70,3 +70,7 @@ delete_server:
 	python3 hw/deleteServer.py
 test_chukonu:
 	python3 hw/test_build_chukonu.py --node node0-build-chukonu  --key_path ${HW_SDK_KEYPEM}.pem
+delete_ip:
+	python3 hw/deleteEIP.py  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --ip-id 0153127f-9a12-4a4d-9259-753bc28c6241
+delete_ip_task:
+	python3 hw/deleteEIP.py  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --info-path ./cache/alice-to_ip_info.txt

@@ -6,7 +6,7 @@ from huaweicloudsdkeip.v2.region.eip_region import EipRegion
 from huaweicloudsdkcore.exceptions import exceptions
 from huaweicloudsdkeip.v2 import *
 
-def create_eip(ak, sk, region,task_name):
+def create_eip(ak, sk, region, task_name):
     credentials = BasicCredentials(ak, sk)
     eip_region = EipRegion.value_of(region)
     
@@ -26,6 +26,18 @@ def create_eip(ak, sk, region,task_name):
             publicip=publicip,
         )
         response = client.create_publicip(request)
+        if(response.publicip):
+            pub = response.publicip
+            print("Created EIP ID:", pub.id)
+            print("EIP Address:", pub.public_ip_address)
+            
+            # Write to file
+            filename = f"./cache/{args.task}_ip_info.txt"
+            with open(filename, 'w') as f:
+                f.write(f"{pub.id}\t{pub.public_ip_address}\n")
+            
+            print(f"EIP information written to {filename}")
+            
         return response.publicip
 
     except exceptions.ClientRequestException as e:
@@ -33,6 +45,7 @@ def create_eip(ak, sk, region,task_name):
         print(e.request_id)
         print(e.error_code)
         print(e.error_msg)
+        return None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Create Huawei Cloud EIP')
@@ -43,6 +56,4 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    pub = create_eip(args.ak, args.sk, args.region,args.task)
-    if pub:
-        print("Created EIP ID:", pub.id)
+    pub = create_eip(args.ak, args.sk, args.region, args.task)

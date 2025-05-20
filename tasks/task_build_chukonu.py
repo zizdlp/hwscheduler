@@ -9,6 +9,7 @@ from hw.config_pwdless import configure_pwdless,read_cluster_info_file
 from huaweicloudsdkecs.v2 import *
 from hw.test_build_chukonu import test_build_chukonu
 from hw.deleteServer import delete_servers
+from hw.deleteEIP import delete_eip_bytask
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='DEMO')
     
@@ -39,40 +40,49 @@ if __name__ == "__main__":
     parser.add_argument('--user', default='root', help='The username to connect as (default: root).')
     args = parser.parse_args()
     
-    instances = parallel_create_instances(
-        ak=args.ak,
-        sk=args.sk,
-        vpc_id=args.vpc_id,
-        num_instances=args.num_instances,
-        region=args.region,
-        instance_type=args.instance_type,
-        instance_zone=args.instance_zone,
-        ami=args.ami,
-        key_pair=args.key_pair,
-        security_group_id=args.security_group_id,
-        subnet_id=args.subnet_id,
-        use_nvme=args.use_nvme,
-        run_number=args.run_number,
-        task_type=args.task_type,
-        timeout_hours=args.timeout_hours,
-        actor=args.actor,
-        use_spot=args.use_spot,
-        use_ip=args.use_ip
-    )
+    try:
+        instances = parallel_create_instances(
+            ak=args.ak,
+            sk=args.sk,
+            vpc_id=args.vpc_id,
+            num_instances=args.num_instances,
+            region=args.region,
+            instance_type=args.instance_type,
+            instance_zone=args.instance_zone,
+            ami=args.ami,
+            key_pair=args.key_pair,
+            security_group_id=args.security_group_id,
+            subnet_id=args.subnet_id,
+            use_nvme=args.use_nvme,
+            run_number=args.run_number,
+            task_type=args.task_type,
+            timeout_hours=args.timeout_hours,
+            actor=args.actor,
+            use_spot=args.use_spot,
+            use_ip=args.use_ip
+        )
+        
+        print("Created instances:", instances)
+        cleanHostsBeforeInsert(args.task_type)
+        save_info(instances,args.task_type,True)
+        printFile("/etc/hosts")
+        key_path = args.key_pair+".pem"
+        cluster_info= "./cache/"+args.task_type+"_nodes_info.txt"
+        configure_pwdless(cluster_info,key_path,args.user)
+        
+        nodes = read_cluster_info_file(cluster_info)
+        master_node = next((node for node in nodes if node['hostname'].startswith('node0-')), None)
+        print(f"====== test build chukonu on {master_node}")
+        test_build_chukonu(master_node['hostname'],key_path, args.user)
     
-    print("Created instances:", instances)
-    cleanHostsBeforeInsert(args.task_type)
-    save_info(instances,args.task_type,True)
-    printFile("/etc/hosts")
-    key_path = args.key_pair+".pem"
-    cluster_info= "./cache/"+args.task_type+"_nodes_info.txt"
-    configure_pwdless(cluster_info,key_path,args.user)
+    except Exception as e:
+        print(f"Error occurred: {e}", file=sys.stderr)
+        sys.exit(1)
     
-    nodes = read_cluster_info_file(cluster_info)
-    master_node = next((node for node in nodes if node['hostname'].startswith('node0-')), None)
-    print(f"====== test build chukonu on {master_node}")
-    test_build_chukonu(master_node['hostname'],key_path, args.user)
-    
-    server_ids=[ServerId(id=node['server_id']) for node in nodes]
-    delete_servers(server_ids,args.region,args.ak,args.sk)
-    
+    finally:
+        # These steps will execute regardless of whether an error occurred
+        if 'nodes' in locals():  # Check if nodes variable exists
+            server_ids=[ServerId(id=node['server_id']) for node in nodes]
+            delete_servers(server_ids,args.region,args.ak,args.sk)
+        ip_info = "./cache/"+args.task_type+"_ip_info.txt"
+        success = delete_eip_bytask(args.ak, args.sk, args.region,ip_info)
