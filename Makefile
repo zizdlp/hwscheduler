@@ -57,15 +57,31 @@ task_build_chukonu:
 		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
 		--actor zizdlp \
 		--use-ip true 
+task_start_runner:
+	python3 tasks/task_start_runner.py \
+	 	--ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} \
+		--vpc-id ${HW_SDK_VPCID} \
+		--num-instances 1 \
+		--instance-type kc1.large.4 \
+		--instance-zone ap-southeast-3a \
+		--ami c3e36999-70ef-48ca-8235-81ca7ca65ef8 \
+		--task-type "start-runner" \
+		--key-pair ${HW_SDK_KEYPEM} \
+		--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
+		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
+		--actor zizdlp \
+		--use-ip true \
+		--github-token ${GITHUB_TOKEN} \
+		--run-number 6
 login:
 	ssh -i ${HW_SDK_KEYPEM}.pem  root@node0-build-chukonu
 pwd_less:
 	python3 hw/config_pwdless.py --cluster-info "./cache/spark_nodes_info.txt"  --key_path ${HW_SDK_KEYPEM}.pem
 
 login_a:
-	ssh -i ${HW_SDK_KEYPEM}.pem  root@159.138.83.128
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@124.243.181.213
 
- 
+
 delete_server:
 	python3 hw/deleteServer.py
 test_chukonu:

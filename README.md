@@ -22,3 +22,11 @@ cd build && make install
 cd build && ctest
 cd scala && ~/.local/share/coursier/bin/sbt test
 ```
+
+
+```
+curl -X POST \
+  -H "Authorization: token ${github_token}" \
+  -H "Accept: application/vnd.github.v3+json" \
+  "https://api.github.com/repos/chukonu-team/chukonu/actions/runners/registration-token"
+```
