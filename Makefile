@@ -23,7 +23,7 @@ deleteServerGroup:
 test_login:
 	python hw/fabricLogin.py --host ${MASTER} --key_path ${HW_SDK_KEYPEM}.pem --user root
 start_container:
-	docker run -it --name temp_schedule -v ./:/mnt/schedule ubuntu:22.04 /bin/bash
+	docker run -itd --name temp_schedule -v ./:/mnt/schedule ubuntu:22.04 /bin/bash
 use_container:
 	docker exec -it temp_schedule /bin/bash
 delete_container:
@@ -43,9 +43,30 @@ line:
 		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
 		--actor alice \
 		--use-ip true 
-
+task_build_chukonu:
+	python3 tasks/task_build_chukonu.py \
+	 	--ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} \
+		--vpc-id ${HW_SDK_VPCID} \
+		--num-instances 1 \
+		--instance-type kc1.large.4 \
+		--instance-zone ap-southeast-3a \
+		--ami 27164e55-d72c-4611-8c74-3e4227197cae \
+		--task-type "build-chukonu" \
+		--key-pair ${HW_SDK_KEYPEM} \
+		--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
+		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
+		--actor zizdlp \
+		--use-ip true 
 login:
-	ssh -i ${HW_SDK_KEYPEM}.pem  root@node0-spark
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@node0-build-chukonu
 pwd_less:
 	python3 hw/config_pwdless.py --cluster-info "./cache/spark_nodes_info.txt"  --key_path ${HW_SDK_KEYPEM}.pem
 
+login_a:
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@159.138.83.128
+
+ 
+delete_server:
+	python3 hw/deleteServer.py
+test_chukonu:
+	python3 hw/test_build_chukonu.py --node node0-build-chukonu  --key_path ${HW_SDK_KEYPEM}.pem

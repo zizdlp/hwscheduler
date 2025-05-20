@@ -77,7 +77,7 @@ def printFile(path):
         print(f"Error: {e}")
     
 # 使用 ssh-keyscan 将节点主机名添加到 known_hosts
-def add_to_known_hosts(hostname, retries=10, delay=5):
+def add_to_known_hosts(hostname, retries=20, delay=5):
     ssh_dir = os.path.expanduser("~/.ssh")
     os.makedirs(ssh_dir, exist_ok=True)
     # 确保 known_hosts 文件存在
