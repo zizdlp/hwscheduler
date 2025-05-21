@@ -1,6 +1,7 @@
 from fabric import Connection
 import argparse
 from datetime import datetime
+import os
 
 def test_spark_base(node, initial_key_path, user):
     """
@@ -12,69 +13,66 @@ def test_spark_base(node, initial_key_path, user):
             user=user,
             connect_kwargs={"key_filename": initial_key_path},
         ) as conn:
-            # 设置环境变量（对所有后续命令生效）
+            # Set environment variables
             conn.config.run.env = {
                 'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-arm64',
                 'CHUKONU_HOME': '/root/chukonu/install',
                 'LD_LIBRARY_PATH': '/root/chukonu/install/lib:/tmp/cache',
                 'CHUKONU_TEMP': '/tmp',
-                'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'  # 确保基本PATH设置
+                'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
             }
             
-            # 创建必要目录
+            # Create necessary directories
             conn.run("mkdir -p /tmp/staging /tmp/cache /root/chukonu/build /root/chukonu/install")
             
-            # 在/tmp下创建带时间戳的测试日志目录
+            # Create timestamped test logs directory
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             test_logs_dir = f"/tmp/chukonu_test_logs_{timestamp}"
             conn.run(f"mkdir -p {test_logs_dir}")
             
             commands = [
-                # Build Scala components
-                'cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt package',
-                'cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt assembly',
+                # Build Spark
+                ('cd /root/spark && ~/.local/share/coursier/bin/sbt package', 'sbt_build.log'),
                 
-                # Create build directory and configure
-                'cd /root/chukonu/build && cmake .. -DCMAKE_BUILD_TYPE=Debug -DWITH_ASAN=OFF -DWITH_JEMALLOC=OFF -DCMAKE_INSTALL_PREFIX="$CHUKONU_HOME"',
-                
-                # Build and install
-                'cd /root/chukonu/build && make install -j4',
+                # Build and install PySpark
+                ('cd /root/spark/python && python3 setup.py sdist', 'pyspark_build.log'),
+                ('cd /root/spark/python && pip install dist/pyspark-3.4.4.dev0.tar.gz', 'pyspark_install.log')
             ]
             
-            for cmd in commands:
+            for cmd, logfile in commands:
                 print(f"Executing on {node}: {cmd}")
-                result = conn.run(cmd, warn=True)
+                log_path = f"{test_logs_dir}/{logfile}"
+                result = conn.run(f"{cmd} > {log_path} 2>&1", warn=True)
                 if not result.ok:
                     print(f"Command failed on {node}: {cmd}")
+                    print(f"Check log file at {log_path}")
                     return False
             
-            # Run C++ tests and capture logs to /tmp
-            print(f"Running C++ tests on {node} and saving logs to {test_logs_dir}/ctest.log")
-            ctest_result = conn.run(
-                'cd /root/chukonu/build && ctest --output-on-failure',
+            # Run C++ tests with comprehensive logging
+            ctest_log = f"{test_logs_dir}/ctest.log"
+            print(f"Running C++ tests on {node} and saving logs to {ctest_log}")
+            conn.run(
+                f'cd /root/spark && ./dev/run-tests --parallelism 1 --modules kubernetes > {ctest_log} 2>&1',
                 warn=True,
-                hide=False,
-                pty=True  # Use pty for interactive programs
+                pty=True
             )
-            conn.run(f"cat > {test_logs_dir}/ctest.log << 'EOF'\n{ctest_result.stdout}\nEOF")
-            if ctest_result.stderr:
-                conn.run(f"echo '\nSTDERR:\n{ctest_result.stderr}' >> {test_logs_dir}/ctest.log")
             
-            # Run Scala tests and capture logs to /tmp
-            print(f"Running Scala tests on {node} and saving logs to {test_logs_dir}/sbt_test.log")
-            sbt_test_result = conn.run(
-                'cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt test',
-                warn=True,
-                hide=False,
-                pty=True  # Use pty for interactive programs
-            )
-            conn.run(f"cat > {test_logs_dir}/sbt_test.log << 'EOF'\n{sbt_test_result.stdout}\nEOF")
-            if sbt_test_result.stderr:
-                conn.run(f"echo '\nSTDERR:\n{sbt_test_result.stderr}' >> {test_logs_dir}/sbt_test.log")
+            # Verify test results
+            result = conn.run(f"grep -i 'fail' {ctest_log} | grep -v '0 Failures' || true", hide=True)
+            if result.stdout.strip():
+                print(f"Tests failed on {node}. Check {ctest_log} for details")
+                return False
             
-            # Compress test logs in /tmp for easy download
+            # Compress test logs
             conn.run(f"tar -czf {test_logs_dir}.tar.gz -C {test_logs_dir} .")
             print(f"Test logs archived to: {test_logs_dir}.tar.gz")
+            
+            # Download the log archive
+            local_cache_dir = "./cache"
+            os.makedirs(local_cache_dir, exist_ok=True)
+            local_log_path = os.path.join(local_cache_dir, f"chukonu_test_logs_{timestamp}.tar.gz")
+            conn.get(f"{test_logs_dir}.tar.gz", local_log_path)
+            print(f"Downloaded test logs to: {local_log_path}")
             
             return True
             
@@ -89,7 +87,7 @@ if __name__ == "__main__":
     parser.add_argument('--user', default="root", help='Remote user (default: root)')
     args = parser.parse_args()
     
-    success = test_build_chukonu(args.node, args.key_path, args.user)
+    success = test_spark_base(args.node, args.key_path, args.user)
     if success:
         print(f"Successfully built Chukonu on {args.node}")
     else:
