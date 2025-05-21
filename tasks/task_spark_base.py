@@ -38,6 +38,7 @@ if __name__ == "__main__":
     parser.add_argument('--use-spot', type=str, default="true", help='Whether to use spot instances')
     parser.add_argument('--use-ip', type=str, default="true", help='Whether to assign public IP')
     parser.add_argument('--user', default='root', help='The username to connect as (default: root).')
+    parser.add_argument('--task-name',required=True, help='哪个测试')
     args = parser.parse_args()
     
     try:
@@ -73,7 +74,7 @@ if __name__ == "__main__":
         nodes = read_cluster_info_file(cluster_info)
         master_node = next((node for node in nodes if node['hostname'].startswith('node0-')), None)
         print(f"====== test spark base on {master_node}")
-        test_spark_base(master_node['hostname'],key_path, args.user)
+        test_spark_base(master_node['hostname'],key_path, args.user,args.task_name)
     
     except Exception as e:
         print(f"Error occurred: {e}", file=sys.stderr)

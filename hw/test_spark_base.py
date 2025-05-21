@@ -2,7 +2,7 @@ from fabric import Connection
 import argparse
 from datetime import datetime
 import os
-def test_spark_base(node, initial_key_path, user):
+def test_spark_base(node, initial_key_path, user,task_name):
     """
     Build and install Chukonu on the specified node
     """
@@ -48,10 +48,10 @@ def test_spark_base(node, initial_key_path, user):
                     return False
             
             # Run C++ tests with comprehensive logging
-            ctest_log = f"{test_logs_dir}/ctest.log"
+            ctest_log = f"{test_logs_dir}/{task_name}.log"
             print(f"Running C++ tests on {node} and saving logs to {ctest_log}")
             conn.run(
-                f'cd /root/spark && ./dev/run-tests --parallelism 1 --modules kubernetes > {ctest_log} 2>&1',
+                f'cd /root/spark && ./dev/run-tests --parallelism 1 --modules {task_name} > {ctest_log} 2>&1',
                 warn=True,
                 pty=True
             )
@@ -107,9 +107,10 @@ if __name__ == "__main__":
     parser.add_argument('--node', required=True, help='Remote node hostname or IP')
     parser.add_argument('--key_path', required=True, help='Path to SSH private key')
     parser.add_argument('--user', default="root", help='Remote user (default: root)')
+    parser.add_argument('--task-name',required=True, help='哪个测试')
     args = parser.parse_args()
     
-    success = test_spark_base(args.node, args.key_path, args.user)
+    success = test_spark_base(args.node, args.key_path, args.user,args.task_name)
     if success:
         print(f"Successfully built Chukonu on {args.node}")
     else:
