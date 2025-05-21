@@ -2,7 +2,6 @@ from fabric import Connection
 import argparse
 from datetime import datetime
 import os
-
 def test_spark_base(node, initial_key_path, user):
     """
     Build and install Chukonu on the specified node
@@ -57,11 +56,35 @@ def test_spark_base(node, initial_key_path, user):
                 pty=True
             )
             
-            # Verify test results
-            result = conn.run(f"grep -i 'fail' {ctest_log} | grep -v '0 Failures' || true", hide=True)
-            if result.stdout.strip():
-                print(f"Tests failed on {node}. Check {ctest_log} for details")
+            # Verify test results and print statistics
+            print(f"\nChecking test results in {ctest_log}...")
+
+            # Extract and print test statistics
+            stats_cmd = (
+                f"grep -E 'Total number of tests run:|Tests: succeeded|All tests passed' {ctest_log} || true"
+            )
+            stats_result = conn.run(stats_cmd, hide=True)
+
+            if not stats_result.stdout.strip():
+                print("No test statistics found in log file")
                 return False
+
+            # Print the statistics
+            print("\nTest Statistics:")
+            print(stats_result.stdout)
+
+            # Check for success conditions
+            success_check = conn.run(
+                f"grep -q 'All tests passed.' {ctest_log} && "
+                f"grep -q 'Tests: succeeded [0-9]+, failed 0, canceled 0, ignored [0-9]+, pending 0' {ctest_log} || true",
+                hide=True
+            )
+
+            if not success_check.ok or not success_check.stdout.strip():
+                print("\nTests failed based on success criteria")
+                return False
+
+            print("\nAll tests passed successfully")
             
             # Compress test logs
             conn.run(f"tar -czf {test_logs_dir}.tar.gz -C {test_logs_dir} .")
@@ -79,7 +102,6 @@ def test_spark_base(node, initial_key_path, user):
     except Exception as e:
         print(f"Error configuring master node {node}: {e}")
         return False
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Build and install Chukonu on remote node')
     parser.add_argument('--node', required=True, help='Remote node hostname or IP')
