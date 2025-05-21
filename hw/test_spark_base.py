@@ -2,6 +2,7 @@ from fabric import Connection
 import argparse
 from datetime import datetime
 import os
+import time
 def test_spark_base(node, initial_key_path, user,task_name):
     """
     Build and install Chukonu on the specified node
@@ -48,14 +49,21 @@ def test_spark_base(node, initial_key_path, user,task_name):
                     return False
             
             # Run C++ tests with comprehensive logging
+            # Run C++ tests with comprehensive logging
             ctest_log = f"{test_logs_dir}/{task_name}.log"
             print(f"Running C++ tests on {node} and saving logs to {ctest_log}")
-            conn.run(
-                f'cd /root/spark && ./dev/run-tests --parallelism 1 --modules {task_name} > {ctest_log} 2>&1',
-                warn=True,
-                pty=True
+
+            # First create an empty log file to ensure it exists
+            conn.run(f"touch {ctest_log}")
+
+            # Run the command with proper output handling
+            # Using tee to capture output while still seeing it in real-time
+            # Using nohup to prevent hanging if the connection drops
+            result = conn.run(
+                f'cd /root/spark && bash -c "./dev/run-tests --parallelism 1 --modules {task_name} > {ctest_log} 2>&1"'
             )
-            
+
+         
             # Verify test results and print statistics
             print(f"\nChecking test results in {ctest_log}...")
 

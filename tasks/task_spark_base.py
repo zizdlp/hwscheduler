@@ -82,9 +82,9 @@ if __name__ == "__main__":
     
     finally:
         pass
-        # These steps will execute regardless of whether an error occurred
-        if 'nodes' in locals():  # Check if nodes variable exists
-            server_ids=[ServerId(id=node['server_id']) for node in nodes]
-            delete_servers(server_ids,args.region,args.ak,args.sk)
-        ip_info = "./cache/"+args.task_type+"_ip_info.txt"
-        success = delete_eip_bytask(args.ak, args.sk, args.region,ip_info)
+        #These steps will execute regardless of whether an error occurred
+        # if 'nodes' in locals():  # Check if nodes variable exists
+        #     server_ids=[ServerId(id=node['server_id']) for node in nodes]
+        #     delete_servers(server_ids,args.region,args.ak,args.sk)
+        # ip_info = "./cache/"+args.task_type+"_ip_info.txt"
+        # success = delete_eip_bytask(args.ak, args.sk, args.region,ip_info)

@@ -81,15 +81,15 @@ task_spark_base:
 		--instance-type kc1.xlarge.4 \
 		--instance-zone ap-southeast-3a \
 		--ami 704106a0-5ab8-491c-8403-73041fca5f54 \
-		--task-type "test-spark-base-kubernets" \
+		--task-type "test-spark-base-kubernetes" \
 		--key-pair ${HW_SDK_KEYPEM} \
 		--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
 		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
 		--actor zizdlp \
 		--use-ip true \
-		--task-name kubernets
+		--task-name kubernetes
 login:
-	ssh -i ${HW_SDK_KEYPEM}.pem  root@node0-build-chukonu-asb
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@node0-test-spark-base-kubernetes
 pwd_less:
 	python3 hw/config_pwdless.py --cluster-info "./cache/spark_nodes_info.txt"  --key_path ${HW_SDK_KEYPEM}.pem
 
