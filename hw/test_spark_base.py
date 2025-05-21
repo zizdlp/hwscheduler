@@ -2,7 +2,7 @@ from fabric import Connection
 import argparse
 from datetime import datetime
 
-def test_build_chukonu(node, initial_key_path, user):
+def test_spark_base(node, initial_key_path, user):
     """
     Build and install Chukonu on the specified node
     """
