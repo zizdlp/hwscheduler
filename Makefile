@@ -78,7 +78,7 @@ task_spark_base:
 	 	--ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} \
 		--vpc-id ${HW_SDK_VPCID} \
 		--num-instances 1 \
-		--instance-type kc1.large.4 \
+		--instance-type kc1.xlarge.4 \
 		--instance-zone ap-southeast-3a \
 		--ami 704106a0-5ab8-491c-8403-73041fca5f54 \
 		--task-type "build-chukonu-asb" \
@@ -88,7 +88,7 @@ task_spark_base:
 		--actor zizdlp \
 		--use-ip true 
 login:
-	ssh -i ${HW_SDK_KEYPEM}.pem  root@node0-build-chukonu
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@node0-build-chukonu-asb
 pwd_less:
 	python3 hw/config_pwdless.py --cluster-info "./cache/spark_nodes_info.txt"  --key_path ${HW_SDK_KEYPEM}.pem
 
