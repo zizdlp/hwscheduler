@@ -245,20 +245,12 @@ hostname: node{instance_index}-{task_type}"""
                 'availability_zone': instance_zone,
                 'auto_terminate_time': terminate_time_str
             }
-            
             # 如果需要绑定EIP
             if  eip_id:
                 server_body_params['publicip'] = PostPaidServerPublicip(
                     id=eip_id,
-                    eip=PostPaidServerEip(
-                        iptype="5_bgp",
-                        bandwidth=PostPaidServerEipBandwidth(
-                            size=5,
-                            sharetype="PER"
-                        )
-                    )
+                    delete_on_termination=True
                 )
-                
             if sg_list:
                 server_body_params['security_groups'] = sg_list
             server_body = PostPaidServer(**server_body_params)
