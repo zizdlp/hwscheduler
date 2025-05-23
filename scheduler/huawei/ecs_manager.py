@@ -1,4 +1,10 @@
 # coding: utf-8
+# 在文件顶部添加新的import
+from fabric import Connection
+from concurrent.futures import ThreadPoolExecutor
+import os
+import subprocess
+
 import argparse
 import os
 import time
@@ -18,6 +24,138 @@ from huaweicloudsdkcore.exceptions import exceptions
 
 console = Console()
 
+# 添加新的SSH配置类
+class SSHConfigurator:
+    def __init__(self, ak, sk, region):
+        self.credentials = BasicCredentials(ak, sk)
+        self.region = region
+
+    def generate_ssh_key_locally(self, key_path="~/.ssh/cluster_key"):
+        """在本地生成SSH密钥对"""
+        expanded_key_path = os.path.expanduser(key_path)
+        private_key = expanded_key_path
+        public_key = f"{private_key}.pub"
+
+        if os.path.exists(private_key):
+            console.print(f"[dim]SSH密钥已存在: {private_key}[/dim]")
+            with open(public_key, 'r') as f:
+                public_key_content = f.read().strip()
+            return private_key, public_key_content
+
+        os.makedirs(os.path.dirname(private_key), exist_ok=True)
+        subprocess.run(f'ssh-keygen -t rsa -N "" -f {private_key}', shell=True, check=True)
+        os.chmod(private_key, 0o600)
+        os.chmod(public_key, 0o644)
+
+        console.print(f"[green]✓ 已生成SSH密钥对: {private_key}[/green]")
+        with open(public_key, 'r') as f:
+            public_key_content = f.read().strip()
+        return private_key, public_key_content
+
+    def clean_and_update_hosts(self, conn, nodes):
+        """清理并更新节点的/etc/hosts文件"""
+        result = conn.run("cat /etc/hosts", hide=True, warn=True)
+        original_lines = result.stdout.splitlines() if result.ok else []
+        
+        node_hostnames = [node['hostname'] for node in nodes]
+        preserved_lines = []
+        for line in original_lines:
+            if not any(line.strip().endswith(hostname) for hostname in node_hostnames) \
+               and not line.strip().startswith('#') \
+               and line.strip() != '':
+                preserved_lines.append(line)
+        
+        new_entries = [f"{node['private_ip']}\t{node['hostname']}" for node in nodes]
+        new_hosts_content = '\n'.join(preserved_lines + new_entries)
+        
+        conn.sudo(f"echo '{new_hosts_content}' > /etc/hosts", warn=True)
+        console.print(f"[dim]已更新 {conn.host} 的hosts文件[/dim]")
+
+    def configure_node(self, node, initial_key_path, user, nodes, private_key):
+        """配置单个节点的SSH免密登录"""
+        try:
+            with Connection(
+                host=node['public_ip'],
+                user=user,
+                connect_kwargs={"key_filename": initial_key_path},
+                connect_timeout=30
+            ) as conn:
+                # 更新hosts文件
+                self.clean_and_update_hosts(conn, nodes)
+                
+                # 配置SSH目录和权限
+                conn.run("mkdir -p ~/.ssh && chmod 700 ~/.ssh", hide=True)
+                
+                # 上传密钥
+                with open(private_key, 'rb') as f:
+                    conn.put(f, remote="/tmp/id_rsa_temp")
+                conn.run("mv /tmp/id_rsa_temp ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa", hide=True)
+                
+                with open(f"{private_key}.pub", 'rb') as f:
+                    conn.put(f, remote="/tmp/id_rsa_temp.pub")
+                conn.run("mv /tmp/id_rsa_temp.pub ~/.ssh/id_rsa.pub && chmod 644 ~/.ssh/id_rsa.pub", hide=True)
+                
+                # 配置authorized_keys
+                conn.run("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys", hide=True)
+                
+                # 配置SSH客户端
+                ssh_config = """
+Host *
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    LogLevel ERROR
+"""
+                conn.run(f"echo '{ssh_config}' > ~/.ssh/config && chmod 600 ~/.ssh/config", hide=True)
+                
+                console.print(f"[green]✓ 已配置 {node['hostname']} 的SSH免密登录[/green]")
+                return True
+        except Exception as e:
+            console.print(f"[red]✗ 配置 {node['hostname']} 失败: {str(e)}[/red]")
+            return False
+
+    def configure_cluster_pwdless(self, nodes_info, initial_key_path, user="root"):
+        """配置整个集群的免密登录"""
+        if not nodes_info:
+            console.print("[yellow]⚠ 没有可配置的节点信息[/yellow]")
+            return False
+
+        console.rule("[bold blue]配置集群SSH免密登录[/bold blue]")
+        
+        # 生成密钥对
+        private_key, _ = self.generate_ssh_key_locally()
+        
+        # 准备节点信息
+        nodes = [{
+            'hostname': f"node-{info['index']}",
+            'public_ip': info['public_ip'],
+            'private_ip': info['private_ip']
+        } for info in nodes_info if info.get('public_ip') != 'N/A']
+        
+        console.print(f"[cyan]正在为 {len(nodes)} 个节点配置免密登录...[/cyan]")
+        
+        # 使用线程池并行配置
+        success_count = 0
+        with ThreadPoolExecutor(max_workers=min(5, len(nodes))) as executor:
+            futures = []
+            for node in nodes:
+                futures.append(executor.submit(
+                    self.configure_node, node, initial_key_path, user, nodes, private_key
+                ))
+            
+            for future in as_completed(futures):
+                if future.result():
+                    success_count += 1
+        
+        console.print(Panel(
+            f"[bold]SSH配置完成![/bold]\n\n"
+            f"[white]总节点数:[/white] {len(nodes)}\n"
+            f"[green]成功配置:[/green] {success_count}\n"
+            f"[red]失败配置:[/red] {len(nodes) - success_count}",
+            title="SSH配置结果",
+            border_style="blue"
+        ))
+        
+        return success_count == len(nodes)
 class EIPManager:
     def __init__(self, ak, sk, region):
         self.credentials = BasicCredentials(ak, sk)
@@ -199,6 +337,7 @@ class ECSInstanceManager:
             .with_region(self.ecs_region) \
             .build()
         self.eip_manager = EIPManager(ak, sk, region)
+        self.ssh_configurator = SSHConfigurator(ak, sk, region)  # 新增SSH配置器
 
     def create_instance(self, progress, task_id, vpc_id, instance_index, instance_type, instance_zone,
                        ami, key_pair, security_group_id, subnet_id, run_number,
@@ -466,6 +605,16 @@ hostname: node{instance_index}-{task_type}"""
         console.print(f"[yellow]⚠ Job {job_id} {entity_info} 检查超时! 未能在 {max_attempts*interval} 秒内完成[/yellow]")
         return False
 
+    def save_instances_info(self, task_name, instances_info):
+        """保存实例信息到文件"""
+        os.makedirs("./cache", exist_ok=True)
+        filename = f"./cache/{task_name}_instances_info.txt"
+        with open(filename, 'w') as f:
+            f.write("Index\tID\tName\tPrivateIP\tPublicIP\tStatus\n")
+            for info in instances_info:
+                f.write(f"{info['index']}\t{info['id']}\t{info['name']}\t{info['private_ip']}\t{info.get('public_ip', 'N/A')}\t{info['status']}\n")
+        console.print(f"[dim]实例信息已保存到: [underline]{filename}[/underline][/dim]")
+        return filename
 def save_eips_to_file(task_name, eip_list):
     """将EIP信息保存到文件"""
     os.makedirs("./cache", exist_ok=True)
@@ -595,6 +744,7 @@ def main():
                 instance_index, task_id = futures[future]
                 try:
                     instance_detail = future.result()
+                    print("instance_detail:",instance_detail)
                     if instance_detail:
                         created_instances_details.append(instance_detail)
                     else:
@@ -617,6 +767,34 @@ def main():
         console.print(f"[yellow]注意: {args.num_instances - len(created_instances_details)} 个实例创建失败.[/yellow]")
 
     if created_instances_details:
+        # 保存实例信息到文件
+        info_file = manager.save_instances_info(
+            f"{args.run_number}_{args.task_type}",
+            created_instances_details
+        )
+        # 配置SSH免密登录（仅在成功创建实例且有公网IP时）
+        if args.use_ip and any(inst.get('public_ip', 'N/A') != 'N/A' for inst in created_instances_details):
+            console.rule("[bold blue]配置SSH免密登录[/bold blue]")
+            
+            # 获取初始SSH密钥路径（从参数或默认位置）
+            initial_key_path = os.path.expanduser("~/.ssh/id_rsa")  # 默认使用用户的SSH密钥
+            if args.key_pair:
+                # 如果是华为云的密钥对，可能需要从特定位置获取
+                initial_key_path = os.path.expanduser(f"~/.ssh/{args.key_pair}.pem")
+            
+            # 配置免密登录
+            ssh_success = manager.ssh_configurator.configure_cluster_pwdless(
+                created_instances_details,
+                initial_key_path=initial_key_path,
+                user="root"
+            )
+            
+            if ssh_success:
+                console.print("[bold green]✓ SSH免密登录配置成功![/bold green]")
+            else:
+                console.print("[yellow]⚠ SSH免密登录配置部分失败[/yellow]")
+        
+        
         table = Table(title="已创建实例列表 (等待删除)", show_header=True, header_style="bold green")
         table.add_column("序号", style="dim", justify="right")
         table.add_column("名称")
