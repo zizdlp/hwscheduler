@@ -338,6 +338,7 @@ class ECSInstanceManager:
             .build()
         self.eip_manager = EIPManager(ak, sk, region)
         self.ssh_configurator = SSHConfigurator(ak, sk, region)  # 新增SSH配置器
+        self.eip_list = []  # 新增实例变量存储EIP列表
 
     def create_instance(self, progress, task_id, vpc_id, instance_index, instance_type, instance_zone,
                        ami, key_pair, security_group_id, subnet_id, run_number,
@@ -412,12 +413,14 @@ hostname: node{instance_index}-{task_type}"""
             
             progress.update(task_id, description=f"[bold green]✓ {instance_name} 创建完成!", completed=100, visible=False)
             
+            # 修改_create_instance方法中的返回部分
             return {
                 'index': instance_index,
                 'id': instance_details['id'],
                 'name': instance_name,
                 'private_ip': instance_details['private_ip'],
-                'public_ip': instance_details.get('public_ip', 'N/A'),
+                # 如果有EIP，则使用EIP的IP地址，否则使用实例详情中的公网IP或'N/A'
+                'public_ip': next((eip['ip'] for eip in self.eip_list if eip['id'] == eip_id), instance_details.get('public_ip', 'N/A')),
                 'status': instance_details['status'],
                 'eip_id': eip_id
             }
@@ -679,28 +682,25 @@ def main():
     instance_zone = args.instance_zone if args.instance_zone else f"{args.region}a"
     created_instances_details = []
     
-    # 如果需要使用EIP，先创建EIP
-    eip_list = []
     if args.use_ip:
         console.print(f"[cyan]正在为 {args.num_instances} 个实例申请EIP...[/cyan]")
-        eip_list = manager.eip_manager.create_eips(
+        manager.eip_list = manager.eip_manager.create_eips(  # 存储到实例变量
             args.num_instances, 
             f"{args.run_number}_{args.task_type}",
             args.bandwidth
         )
         
-        if not eip_list or len(eip_list) < args.num_instances:
+        if not manager.eip_list or len(manager.eip_list) < args.num_instances:
             console.print("[red]✗ EIP申请失败或数量不足，无法继续创建实例[/red]")
             return
-            
-        save_eips_to_file(f"{args.run_number}_{args.task_type}", eip_list)
+        save_eips_to_file(f"{args.run_number}_{args.task_type}", manager.eip_list)
         
         # 显示EIP信息
         eip_table = Table(title="已申请EIP列表", show_header=True, header_style="bold cyan")
         eip_table.add_column("序号", style="dim", justify="right")
         eip_table.add_column("EIP ID")
         eip_table.add_column("IP地址")
-        for i, eip in enumerate(eip_list, 1):
+        for i, eip in enumerate(manager.eip_list, 1):
             eip_table.add_row(str(i), eip['id'], eip['ip'])
         console.print(eip_table)
 
@@ -719,7 +719,7 @@ def main():
                 creation_progress.update(task_id, completed=0)
 
                 # 如果有EIP列表，获取对应的EIP ID
-                eip_id = eip_list[i]['id'] if args.use_ip and i < len(eip_list) else None
+                eip_id = manager.eip_list[i]['id'] if args.use_ip and i < len(manager.eip_list) else None
                 
                 future = executor.submit(
                     manager.create_instance,
@@ -756,9 +756,9 @@ def main():
     if not created_instances_details:
         console.print("[red]✗ 测试失败: 没有实例成功创建.[/red]")
         # 清理已申请的EIP
-        if args.use_ip and eip_list:
+        if args.use_ip and manager.eip_list:
             console.print("[yellow]清理已申请的EIP...[/yellow]")
-            manager.eip_manager.delete_eips([eip['id'] for eip in eip_list])
+            manager.eip_manager.delete_eips([eip['id'] for eip in manager.eip_list])
         return
 
     console.print(f"\n[bold green]总共 {len(created_instances_details)}/{args.num_instances} 个实例创建成功.[/bold green]")
