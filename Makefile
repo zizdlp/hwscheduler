@@ -109,9 +109,9 @@ delete_ip:
 delete_ip_task:
 	python3 hw/deleteEIP.py  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --info-path ./cache/alice-to_ip_info.txt
 test_eip_manager:
-	python -m scheduler.huawei.eip_manager  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --task alice --auto-clean
+	python -m scheduler.huawei.eip_manager  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --task alice --num 4 --auto-clean 
 test_ecs_manager:
 	python -m scheduler.huawei.ecs_manager  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
 		--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
 		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
-		--num-instances 4 --instance-type kc1.large.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1001 --task-type spark --actor admin
+		--num-instances 4 --instance-type kc1.large.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1001 --task-type spark --actor admin --use-ip
