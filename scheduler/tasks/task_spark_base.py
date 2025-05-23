@@ -1,14 +1,14 @@
 # coding: utf-8
 import sys
 from scheduler.huawei.saveInfo import save_info,cleanHostsBeforeInsert
-from scheduler.huawei.createInstance import parallel_create_instances
+from scheduler.huawei.ecs_manager import parallel_create_instances
 from scheduler.huawei.saveInfo import printFile
 import argparse
 from scheduler.huawei.config_pwdless import configure_pwdless,read_cluster_info_file
 from huaweicloudsdkecs.v2 import *
 from scheduler.huawei.test_spark_base import test_spark_base
 from scheduler.huawei.deleteServer import delete_servers
-from scheduler.huawei.deleteEIP import delete_eip_bytask
+from scheduler.huawei.delete_eip import delete_eip_bytask
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='DEMO')
     
