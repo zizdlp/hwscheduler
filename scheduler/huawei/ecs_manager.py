@@ -292,6 +292,7 @@ hostname: node{instance_index}-{task_type}"""
             }
 
         except exceptions.ClientRequestException as e:
+            print(f"创建失败：${e.error_msg}")
             progress.update(task_id, description=f"[bold red]✗ {instance_name} 创建异常: {e.error_code}", completed=100, visible=False)
             return None
         except Exception as ex:

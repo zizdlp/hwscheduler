@@ -1,0 +1,8 @@
+2025-05-23 17:44:37,439 - huawei_cloud - INFO - 开始创建实例 1001-spark-node0-timeout1-admin
+2025-05-23 17:44:37,442 - huawei_cloud - INFO - 开始创建实例 1001-spark-node1-timeout1-admin
+2025-05-23 17:44:37,449 - huawei_cloud - INFO - 开始创建实例 1001-spark-node2-timeout1-admin
+2025-05-23 17:44:37,455 - huawei_cloud - INFO - 开始创建实例 1001-spark-node3-timeout1-admin
+2025-05-23 17:44:39,893 - huawei_cloud - ERROR - 创建实例 1001-spark-node3-timeout1-admin 失败 (华为云错误): Ecs.0000 - using a existing eip and creating a new eip can't be used at the same time.
+2025-05-23 17:44:39,894 - huawei_cloud - ERROR - 创建实例 1001-spark-node2-timeout1-admin 失败 (华为云错误): Ecs.0000 - using a existing eip and creating a new eip can't be used at the same time.
+2025-05-23 17:44:39,894 - huawei_cloud - ERROR - 创建实例 1001-spark-node0-timeout1-admin 失败 (华为云错误): Ecs.0000 - using a existing eip and creating a new eip can't be used at the same time.
+2025-05-23 17:44:40,371 - huawei_cloud - ERROR - 创建实例 1001-spark-node1-timeout1-admin 失败 (华为云错误): Ecs.0000 - using a existing eip and creating a new eip can't be used at the same time.
