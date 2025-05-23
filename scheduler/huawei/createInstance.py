@@ -8,7 +8,7 @@ from huaweicloudsdkcore.auth.credentials import BasicCredentials
 from huaweicloudsdkecs.v2.region.ecs_region import EcsRegion
 from huaweicloudsdkcore.exceptions import exceptions
 from huaweicloudsdkecs.v2 import *
-from .createEIP import create_eip
+from scheduler.huawei.createEIP import create_eip
 from datetime import datetime, timedelta
 import time
 def create_hw_instances(ak, sk, vpc_id, instance_index, region, instance_type, instance_zone, ami, key_pair, 

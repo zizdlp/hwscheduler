@@ -44,7 +44,7 @@ line:
 		--actor alice \
 		--use-ip true 
 task_build_chukonu:
-	python3 tasks/task_build_chukonu.py \
+	python -m scheduler.tasks.task_build_chukonu \
 	 	--ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} \
 		--vpc-id ${HW_SDK_VPCID} \
 		--num-instances 1 \
@@ -58,7 +58,7 @@ task_build_chukonu:
 		--actor zizdlp \
 		--use-ip true 
 task_start_runner:
-	python3 tasks/task_start_runner.py \
+	python -m scheduler.tasks.task_start_runner \
 	 	--ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} \
 		--vpc-id ${HW_SDK_VPCID} \
 		--num-instances 1 \
@@ -72,9 +72,10 @@ task_start_runner:
 		--actor zizdlp \
 		--use-ip true \
 		--github-token ${GITHUB_TOKEN} \
-		--run-number 6
+		--run-number 6 \
+		--user root 
 task_spark_base:
-	python3 tasks/task_spark_base.py \
+	python scheduler/tasks/task_spark_base.py \
 	 	--ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} \
 		--vpc-id ${HW_SDK_VPCID} \
 		--num-instances 1 \
