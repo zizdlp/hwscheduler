@@ -9,13 +9,183 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 from rich.panel import Panel
 from rich.table import Table
-# from rich.style import Style # Style is not used directly, can be removed if not planned
 from huaweicloudsdkcore.auth.credentials import BasicCredentials
 from huaweicloudsdkecs.v2.region.ecs_region import EcsRegion
 from huaweicloudsdkecs.v2 import *
+from huaweicloudsdkeip.v2.region.eip_region import EipRegion
+from huaweicloudsdkeip.v2 import *
 from huaweicloudsdkcore.exceptions import exceptions
 
 console = Console()
+
+class EIPManager:
+    def __init__(self, ak, sk, region):
+        self.credentials = BasicCredentials(ak, sk)
+        self.region = EipRegion.value_of(region)
+        self.client = EipClient.new_builder() \
+            .with_credentials(self.credentials) \
+            .with_region(self.region) \
+            .build()
+
+    def create_eips(self, num_eips, task_name, bandwidth_size=5):
+        """批量创建EIP"""
+        created_eips = []
+        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress:
+            with ThreadPoolExecutor(max_workers=min(num_eips, 10)) as executor:
+                futures = {}
+                for i in range(num_eips):
+                    task_id = progress.add_task(f"EIP {i+1}...", total=100)
+                    progress.update(task_id, completed=0)
+
+                    future = executor.submit(
+                        self._create_single_eip,
+                        progress, task_id,
+                        task_name=f"{task_name}_{i+1}",
+                        bandwidth_size=bandwidth_size
+                    )
+                    futures[future] = (i+1, task_id)
+
+                for future in as_completed(futures):
+                    eip_index, task_id = futures[future]
+                    try:
+                        eip_detail = future.result()
+                        if eip_detail:
+                            created_eips.append(eip_detail)
+                        else:
+                            progress.update(task_id, description=f"[red]✗ EIP {eip_index} 创建失败", completed=100, visible=False)
+                    except Exception as e:
+                        progress.update(task_id, description=f"[red]✗ EIP {eip_index} 错误: {e}", completed=100, visible=False)
+                        console.print(f"[red]处理EIP {eip_index} 时出错: {e}[/red]")
+        
+        return created_eips
+
+    def _create_single_eip(self, progress, task_id, task_name, bandwidth_size=5):
+        """创建单个EIP"""
+        progress.update(task_id, description=f"[cyan]准备创建EIP {task_name}...")
+        
+        try:
+            request = CreatePublicipRequest()
+            publicip = CreatePublicipOption(type="5_bgp")
+            bandwidth = CreatePublicipBandwidthOption(
+                share_type="PER",
+                name=task_name,
+                size=bandwidth_size
+            )
+            request.body = CreatePublicipRequestBody(
+                bandwidth=bandwidth,
+                publicip=publicip,
+            )
+            
+            progress.update(task_id, description=f"[cyan]发送创建请求 {task_name}...")
+            response = self.client.create_publicip(request)
+
+            if not response.publicip:
+                progress.update(task_id, description=f"[bold red]✗ {task_name} 创建失败: 未返回EIP信息", completed=100, visible=False)
+                return None
+
+            pub = response.publicip
+            progress.update(task_id, description=f"[green]✓ {task_name} 创建成功 (ID: {pub.id})", completed=100, visible=False)
+            
+            return {
+                'id': pub.id,
+                'ip': pub.public_ip_address,
+                'name': task_name
+            }
+
+        except exceptions.ClientRequestException as e:
+            progress.update(task_id, description=f"[bold red]✗ {task_name} 创建异常: {e.error_code}", completed=100, visible=False)
+            return None
+        except Exception as ex:
+            progress.update(task_id, description=f"[bold red]✗ {task_name} 创建未知异常", completed=100, visible=False)
+            return None
+
+    def delete_eips(self, eip_ids):
+        """批量删除EIP"""
+        if not eip_ids:
+            console.print("[yellow]⚠ 没有可删除的EIP![/yellow]")
+            return True
+
+        success_count = 0
+        failed_deletions = []
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            console=console,
+            transient=True
+        ) as progress_bar:
+            with ThreadPoolExecutor(max_workers=min(5, len(eip_ids))) as executor:
+                future_to_eip_id = {
+                    executor.submit(self._delete_single_eip, progress_bar, eip_id): eip_id
+                    for eip_id in eip_ids
+                }
+                for future in as_completed(future_to_eip_id):
+                    eip_id = future_to_eip_id[future]
+                    try:
+                        if future.result():
+                            success_count += 1
+                        else:
+                            failed_deletions.append(eip_id)
+                    except Exception as exc:
+                        console.print(f"[red]删除EIP {eip_id} 时发生意外错误: {exc}[/red]")
+                        failed_deletions.append(eip_id)
+
+        console.print(Panel(
+            f"[bold]EIP删除操作完成![/bold]\n\n"
+            f"[white]总尝试删除:[/white] {len(eip_ids)}\n"
+            f"[green]成功删除:[/green] {success_count}\n"
+            f"[red]删除失败:[/red] {len(failed_deletions)}"
+            + (f"\n[white]失败列表:[/white] [red]{', '.join(failed_deletions)}[/red]" if failed_deletions else ""),
+            title="EIP删除结果统计",
+            border_style="blue"
+        ))
+        return success_count == len(eip_ids)
+
+    def _delete_single_eip(self, progress, eip_id, max_retries=2):
+        """删除单个EIP"""
+        task_id = progress.add_task(f"删除EIP {eip_id}...", total=1)
+        retry_count = 0
+        deleted = False
+        
+        while retry_count <= max_retries and not deleted:
+            progress.update(task_id, description=f"删除EIP {eip_id} (尝试 {retry_count + 1})")
+            
+            try:
+                request = DeletePublicipRequest(publicip_id=eip_id)
+                self.client.delete_publicip(request)
+                
+                progress.update(task_id, description=f"[green]✓ {eip_id} 删除成功!", completed=1)
+                deleted = True
+                return True
+                
+            except exceptions.ClientRequestException as e:
+                if e.status_code == 404:
+                    progress.update(task_id, description=f"[yellow]EIP {eip_id} 不存在或已删除", completed=1)
+                    return True
+                progress.update(task_id, description=f"[red]删除 {eip_id} 失败: {e.error_code} (尝试 {retry_count + 1})")
+                retry_count += 1
+                if retry_count <= max_retries: 
+                    time.sleep(5 * (retry_count))
+            except Exception as ex:
+                progress.update(task_id, description=f"[red]删除 {eip_id} 未知错误 (尝试 {retry_count + 1})")
+                retry_count += 1
+                if retry_count <= max_retries: 
+                    time.sleep(5)
+        
+        if not deleted:
+            progress.update(task_id, description=f"[bold red]✗ {eip_id} 删除失败 (最大重试)", completed=1)
+        return deleted
 
 class ECSInstanceManager:
     def __init__(self, ak, sk, region):
@@ -28,10 +198,11 @@ class ECSInstanceManager:
             .with_credentials(self.credentials) \
             .with_region(self.ecs_region) \
             .build()
+        self.eip_manager = EIPManager(ak, sk, region)
 
     def create_instance(self, progress, task_id, vpc_id, instance_index, instance_type, instance_zone,
                        ami, key_pair, security_group_id, subnet_id, run_number,
-                       task_type, timeout_hours, actor, use_ip=True):
+                       task_type, timeout_hours, actor, eip_id=None):
         """创建单个ECS实例"""
         instance_name = f"{run_number}-{task_type}-node{instance_index}-timeout{timeout_hours}-{actor}"
         
@@ -74,6 +245,20 @@ hostname: node{instance_index}-{task_type}"""
                 'availability_zone': instance_zone,
                 'auto_terminate_time': terminate_time_str
             }
+            
+            # 如果需要绑定EIP
+            if  eip_id:
+                server_body_params['publicip'] = PostPaidServerPublicip(
+                    id=eip_id,
+                    eip=PostPaidServerEip(
+                        iptype="5_bgp",
+                        bandwidth=PostPaidServerEipBandwidth(
+                            size=5,
+                            sharetype="PER"
+                        )
+                    )
+                )
+                
             if sg_list:
                 server_body_params['security_groups'] = sg_list
             server_body = PostPaidServer(**server_body_params)
@@ -84,16 +269,10 @@ hostname: node{instance_index}-{task_type}"""
 
             if not response.server_ids or len(response.server_ids) == 0:
                 progress.update(task_id, description=f"[bold red]✗ {instance_name} 创建失败: 未返回ID", completed=100, visible=False)
-                console.print(Panel(
-                    f"[bold red]✗ 实例 {instance_name} 创建失败![/bold red]\n\n"
-                    f"[white]原因:[/white] 未返回服务器ID",
-                    border_style="red"
-                ))
                 return None
 
             server_id = response.server_ids[0]
             progress.update(task_id, description=f"[green]✓ {instance_name} 请求成功 (ID: {server_id})...等待就绪")
-            # console.print(f"[green]✓ 实例 {instance_name} 创建请求提交成功![/green] [dim]服务器ID: {server_id}[/dim]")
 
             instance_details = self._wait_for_instance_ready(progress, task_id, server_id, instance_name)
             if not instance_details:
@@ -101,46 +280,26 @@ hostname: node{instance_index}-{task_type}"""
                 return None
             
             progress.update(task_id, description=f"[bold green]✓ {instance_name} 创建完成!", completed=100, visible=False)
-            console.print(Panel(
-                f"[bold green]✓ 实例创建完成![/bold green]\n\n"
-                f"[white]名称:[/white] [cyan]{instance_name}[/cyan]\n"
-                f"[white]ID:[/white] [yellow]{instance_details['id']}[/yellow]\n"
-                f"[white]私有IP:[/white] [blue]{instance_details['private_ip']}[/blue]\n"
-                f"[white]状态:[/white] [green]{instance_details['status']}[/green]",
-                title=f"创建结果: {instance_name}",
-                border_style="green"
-            ))
-
+            
             return {
                 'index': instance_index,
                 'id': instance_details['id'],
                 'name': instance_name,
                 'private_ip': instance_details['private_ip'],
-                'status': instance_details['status']
+                'public_ip': instance_details.get('public_ip', 'N/A'),
+                'status': instance_details['status'],
+                'eip_id': eip_id
             }
 
         except exceptions.ClientRequestException as e:
             progress.update(task_id, description=f"[bold red]✗ {instance_name} 创建异常: {e.error_code}", completed=100, visible=False)
-            console.print(Panel(
-                f"[bold red]✗ 实例 {instance_name} 创建失败![/bold red]\n\n"
-                f"[white]错误代码:[/white] {e.error_code}\n"
-                f"[white]错误信息:[/white] {e.error_msg}",
-                border_style="red"
-            ))
             return None
         except Exception as ex:
             progress.update(task_id, description=f"[bold red]✗ {instance_name} 创建未知异常", completed=100, visible=False)
-            console.print(Panel(
-                f"[bold red]✗ 实例 {instance_name} 创建时发生意外错误![/bold red]\n\n"
-                f"[white]错误:[/white] {str(ex)}",
-                border_style="red"
-            ))
             return None
-
 
     def _wait_for_instance_ready(self, progress, task_id, server_id, instance_name="[N/A]", timeout=300, interval=10):
         """等待实例变为ACTIVE状态"""
-        # console.print(f"[dim]等待实例 {instance_name} ({server_id}) 启动 (超时: {timeout}秒)...[/dim]")
         progress.update(task_id, description=f"[cyan]等待 {instance_name} ({server_id}) 启动...")
         start_time = time.time()
         while time.time() - start_time < timeout:
@@ -150,41 +309,44 @@ hostname: node{instance_index}-{task_type}"""
                 status = detail_response.server.status
                 
                 progress.update(task_id, description=f"[cyan]状态 {instance_name}: {status} (等待 {int(time.time()-start_time)}s)")
-                # console.print(f"[dim]实例 {instance_name} 当前状态: {status} (已等待 {int(time.time()-start_time)}秒)[/dim]")
 
                 if status == "ACTIVE":
                     private_ip = None
+                    public_ip = None
+                    
+                    # 获取私有IP
                     if hasattr(detail_response.server, 'addresses'):
                         for _, ip_list in detail_response.server.addresses.items():
                             for ip_info in ip_list:
                                 if ip_info.addr: 
-                                    private_ip = ip_info.addr
+                                    if ip_info.os_ext_ip_stype == 'fixed':
+                                        private_ip = ip_info.addr
+                                    elif ip_info.os_ext_ip_stype == 'floating':
+                                        public_ip = ip_info.addr
                                     break
-                            if private_ip:
+                            if private_ip and public_ip:
                                 break
-                    if not private_ip and hasattr(detail_response.server, 'metadata') and 'private_ip' in detail_response.server.metadata:
-                         private_ip = detail_response.server.metadata['private_ip']
+                    
+                    # 获取EIP信息
+                    if hasattr(detail_response.server, 'publicip'):
+                        public_ip = detail_response.server.publicip.public_ip_address
+                    
                     return {
                         'id': detail_response.server.id,
                         'private_ip': private_ip if private_ip else "N/A",
+                        'public_ip': public_ip if public_ip else "N/A",
                         'status': status
                     }
                 elif status == "ERROR":
-                    # progress.update(task_id, description=f"[bold red]✗ {instance_name} ({server_id}) 状态 ERROR") # Handled by caller
-                    console.print(f"[bold red]✗ 实例 {instance_name} ({server_id}) 创建失败! 状态: ERROR[/bold red]")
                     return None
                 time.sleep(interval)
             except exceptions.ClientRequestException as e:
                 if e.status_code == 404 or "NotFound" in e.error_code or "Ecs.0114" in e.error_code:
                     progress.update(task_id, description=f"[yellow]{instance_name} 暂未找到, 等待...")
-                    # console.print(f"[yellow]实例 {instance_name} ({server_id}) 暂未找到，继续等待... (错误: {e.error_code})[/yellow]")
                 else:
                     progress.update(task_id, description=f"[red]检查 {instance_name} 状态出错: {e.error_code}")
-                    # console.print(f"[red]检查实例 {instance_name} ({server_id}) 状态时出错: {e.error_msg}[/red]")
                 time.sleep(interval)
         
-        # progress.update(task_id, description=f"[yellow]⚠ {instance_name} 等待超时") # Handled by caller
-        console.print(f"[yellow]⚠ 等待超时! 实例 {instance_name} ({server_id}) 未在 {timeout} 秒内变为ACTIVE状态[/yellow]")
         return None
 
     def delete_instances(self, server_ids, max_retries=2):
@@ -192,14 +354,6 @@ hostname: node{instance_index}-{task_type}"""
         if not server_ids:
             console.print("[yellow]⚠ 没有可删除的实例![/yellow]")
             return True
-
-        table = Table(title="待删除实例列表", show_header=True, header_style="bold magenta")
-        table.add_column("序号", style="dim", justify="right")
-        table.add_column("实例ID")
-        for i, server_id in enumerate(server_ids, 1):
-            table.add_row(str(i), server_id)
-        console.print(table)
-        console.print("[bold]开始删除实例...[/bold]")
 
         success_count = 0
         failed_deletions = []
@@ -211,9 +365,8 @@ hostname: node{instance_index}-{task_type}"""
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TimeElapsedColumn(),
             console=console,
-            transient=True # Makes progress disappear on completion
+            transient=True
         ) as progress_bar:
-            # delete_overall_task = progress_bar.add_task("[red]删除实例...", total=len(server_ids)) # Use this if not using ThreadPool
             with ThreadPoolExecutor(max_workers=min(5, len(server_ids))) as executor:
                 future_to_server_id = {
                     executor.submit(self._delete_single_instance, progress_bar, server_id, max_retries): server_id
@@ -229,7 +382,6 @@ hostname: node{instance_index}-{task_type}"""
                     except Exception as exc:
                         console.print(f"[red]删除实例 {server_id} 时发生意外错误: {exc}[/red]")
                         failed_deletions.append(server_id)
-                    # progress_bar.update(delete_overall_task, advance=1) # Use this if not using ThreadPool
 
         console.print(Panel(
             f"[bold]删除操作完成![/bold]\n\n"
@@ -259,39 +411,32 @@ hostname: node{instance_index}-{task_type}"""
                 response = self.client.delete_servers(request)
                 job_id = response.job_id
                 progress.update(task_id, description=f"删除 {server_id}, Job: {job_id}, 等待完成...")
-                # console.print(f"[dim]实例 {server_id} 删除操作已提交，Job ID: {job_id}[/dim]")
 
                 if self._wait_for_job_complete(progress, task_id, job_id, server_id_for_log=server_id):
                     progress.update(task_id, description=f"[green]✓ {server_id} 删除成功!", completed=1)
-                    # console.print(f"[green]✓ 实例 {server_id} 删除成功![/green]")
                     deleted = True
                     return True
                 else:
                     progress.update(task_id, description=f"[yellow]{server_id} Job未成功 (尝试 {retry_count + 1})")
-                    # console.print(f"[yellow]实例 {server_id} 删除Job未成功完成 (尝试 {retry_count + 1}/{max_retries + 1})[/yellow]")
                     retry_count += 1
                     if retry_count <= max_retries: time.sleep(5 * (retry_count))
 
             except exceptions.ClientRequestException as e:
                 progress.update(task_id, description=f"[red]删除 {server_id} 失败: {e.error_code} (尝试 {retry_count + 1})")
-                # console.print(f"[red]删除实例 {server_id} 失败: {e.error_msg} (尝试 {retry_count + 1}/{max_retries + 1})[/red]")
                 retry_count += 1
                 if retry_count <= max_retries: time.sleep(5)
             except Exception as ex:
                 progress.update(task_id, description=f"[red]删除 {server_id} 未知错误 (尝试 {retry_count + 1})")
-                # console.print(f"[bold red]✗ 删除实例 {server_id} 时发生未知错误: {str(ex)} (尝试 {retry_count + 1}/{max_retries + 1})[/bold red]")
                 retry_count += 1
                 if retry_count <= max_retries: time.sleep(5)
         
         if not deleted:
             progress.update(task_id, description=f"[bold red]✗ {server_id} 删除失败 (最大重试)", completed=1)
-            # console.print(f"[bold red]✗ 实例 {server_id} 删除失败，已达最大重试次数.[/bold red]")
         return deleted
 
     def _wait_for_job_complete(self, progress, task_id, job_id, server_id_for_log="N/A", max_attempts=30, interval=10):
         """等待作业完成"""
         current_desc_prefix = progress.tasks[task_id].description.split(", 等待完成...")[0] if progress and task_id is not None else f"Job {job_id}"
-
 
         for attempt in range(max_attempts):
             progress.update(task_id, description=f"{current_desc_prefix}, Job状态检查 {attempt+1}/{max_attempts}...")
@@ -306,7 +451,6 @@ hostname: node{instance_index}-{task_type}"""
                      entity_info = f"(关联实例: {server_id_for_log})"
                 
                 progress.update(task_id, description=f"{current_desc_prefix}, Job: {status} {entity_info}")
-                # console.print(f"[dim]Job {job_id} {entity_info} 状态检查 [{attempt+1}/{max_attempts}]: {status}[/dim]")
 
                 if hasattr(job_response, 'sub_jobs') and job_response.sub_jobs:
                     for sub_job in job_response.sub_jobs:
@@ -321,15 +465,44 @@ hostname: node{instance_index}-{task_type}"""
                 time.sleep(interval)
             except exceptions.ClientRequestException as e:
                 progress.update(task_id, description=f"{current_desc_prefix}, Job状态检查失败: {e.error_code}")
-                # console.print(f"[red]检查Job {job_id} {entity_info} 状态失败: {e.error_code} - {e.error_msg}[/red]")
                 time.sleep(interval)
             except Exception as ex_job:
                 progress.update(task_id, description=f"{current_desc_prefix}, Job状态意外错误")
-                # console.print(f"[red]检查Job {job_id} {entity_info} 状态时发生意外错误: {str(ex_job)}[/red]")
                 time.sleep(interval)
         
         console.print(f"[yellow]⚠ Job {job_id} {entity_info} 检查超时! 未能在 {max_attempts*interval} 秒内完成[/yellow]")
         return False
+
+def save_eips_to_file(task_name, eip_list):
+    """将EIP信息保存到文件"""
+    os.makedirs("./cache", exist_ok=True)
+    filename = f"./cache/{task_name}_ip_info.txt"
+    with open(filename, 'w') as f:
+        f.write("ID\tIP\n")  # 表头
+        for eip in eip_list:
+            if eip:  # 过滤掉创建失败的实例
+                f.write(f"{eip['id']}\t{eip['ip']}\n")
+    console.print(f"[dim]EIP信息已保存到: [underline]{filename}[/underline][/dim]")
+
+def read_eips_from_file(task_name):
+    """从文件读取EIP信息"""
+    filename = f"./cache/{task_name}_ip_info.txt"
+    if not os.path.exists(filename):
+        return None
+    
+    eip_list = []
+    with open(filename, 'r') as f:
+        # 跳过表头
+        next(f)
+        for line in f:
+            parts = line.strip().split('\t')
+            if len(parts) >= 2:
+                eip_list.append({
+                    'id': parts[0],
+                    'ip': parts[1]
+                })
+    return eip_list
+
 def main():
     parser = argparse.ArgumentParser(
         description='华为云ECS实例创建后自动删除工具 (支持多实例)',
@@ -356,12 +529,38 @@ def main():
     parser.add_argument('--timeout-hours', default="1", help='自动终止时间(小时, 默认1小时)')
     parser.add_argument('--actor', required=True, help='操作者')
     parser.add_argument('--use-ip', action='store_true', help='是否分配公网IP (默认为不分配)', default=False)
+    parser.add_argument('--bandwidth', type=int, default=5, help='EIP带宽大小(Mbps)')
     args = parser.parse_args()
 
     manager = ECSInstanceManager(args.ak, args.sk, args.region)
     console.rule(f"[bold blue]测试模式: 创建 {args.num_instances} 个实例后自动删除[/bold blue]")
     instance_zone = args.instance_zone if args.instance_zone else f"{args.region}a"
     created_instances_details = []
+    
+    # 如果需要使用EIP，先创建EIP
+    eip_list = []
+    if args.use_ip:
+        console.print(f"[cyan]正在为 {args.num_instances} 个实例申请EIP...[/cyan]")
+        eip_list = manager.eip_manager.create_eips(
+            args.num_instances, 
+            f"{args.run_number}_{args.task_type}",
+            args.bandwidth
+        )
+        
+        if not eip_list or len(eip_list) < args.num_instances:
+            console.print("[red]✗ EIP申请失败或数量不足，无法继续创建实例[/red]")
+            return
+            
+        save_eips_to_file(f"{args.run_number}_{args.task_type}", eip_list)
+        
+        # 显示EIP信息
+        eip_table = Table(title="已申请EIP列表", show_header=True, header_style="bold cyan")
+        eip_table.add_column("序号", style="dim", justify="right")
+        eip_table.add_column("EIP ID")
+        eip_table.add_column("IP地址")
+        for i, eip in enumerate(eip_list, 1):
+            eip_table.add_row(str(i), eip['id'], eip['ip'])
+        console.print(eip_table)
 
     with Progress(
         SpinnerColumn(),
@@ -370,14 +569,16 @@ def main():
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         TimeElapsedColumn(),
         console=console,
-        # transient=True # Keep it visible until all creation tasks are done or explicitly hidden
     ) as creation_progress:
         with ThreadPoolExecutor(max_workers=min(args.num_instances, 10)) as executor:
             futures = {}
             for i in range(args.num_instances):
-                task_id = creation_progress.add_task(f"Instance {i}...", total=100, start=False, visible=True) # total=100 for percentage
+                task_id = creation_progress.add_task(f"Instance {i}...", total=100, start=False, visible=True)
                 creation_progress.update(task_id, completed=0)
 
+                # 如果有EIP列表，获取对应的EIP ID
+                eip_id = eip_list[i]['id'] if args.use_ip and i < len(eip_list) else None
+                
                 future = executor.submit(
                     manager.create_instance,
                     creation_progress, task_id, 
@@ -393,7 +594,7 @@ def main():
                     task_type=args.task_type,
                     timeout_hours=args.timeout_hours,
                     actor=args.actor,
-                    use_ip=args.use_ip
+                    eip_id=eip_id
                 )
                 futures[future] = (i, task_id) 
 
@@ -411,9 +612,12 @@ def main():
 
     if not created_instances_details:
         console.print("[red]✗ 测试失败: 没有实例成功创建.[/red]")
+        # 清理已申请的EIP
+        if args.use_ip and eip_list:
+            console.print("[yellow]清理已申请的EIP...[/yellow]")
+            manager.eip_manager.delete_eips([eip['id'] for eip in eip_list])
         return
 
-    # Corrected line below:
     console.print(f"\n[bold green]总共 {len(created_instances_details)}/{args.num_instances} 个实例创建成功.[/bold green]")
     
     if len(created_instances_details) < args.num_instances:
@@ -425,6 +629,7 @@ def main():
         table.add_column("名称")
         table.add_column("ID")
         table.add_column("私有IP")
+        table.add_column("公网IP")
         table.add_column("状态")
         for inst in sorted(created_instances_details, key=lambda x: x['index']):
             table.add_row(
@@ -432,10 +637,14 @@ def main():
                 inst['name'],
                 inst['id'],
                 inst.get('private_ip', 'N/A'),
+                inst.get('public_ip', 'N/A'),
                 inst['status']
             )
         console.print(table)
+        
         server_ids_to_delete = [inst['id'] for inst in created_instances_details]
+        eip_ids_to_delete = [inst['eip_id'] for inst in created_instances_details if inst.get('eip_id')]
+        
         console.rule("[bold red]自动删除模式[/bold red]")
         wait_seconds = 10 
         console.print(f"[yellow]等待 {wait_seconds} 秒后自动删除 {len(server_ids_to_delete)} 个已创建的实例...[/yellow]")
@@ -444,7 +653,20 @@ def main():
             time.sleep(1)
         print("\r" + " " * 30 + "\r", end="") 
 
+        # 先删除实例
         all_deleted_successfully = manager.delete_instances(server_ids_to_delete)
+        
+        # 然后删除EIP
+        if eip_ids_to_delete:
+            console.print("[cyan]开始清理关联的EIP...[/cyan]")
+            manager.eip_manager.delete_eips(eip_ids_to_delete)
+            
+            # 清理文件
+            info_path = f"./cache/{args.run_number}_{args.task_type}_ip_info.txt"
+            if os.path.exists(info_path):
+                os.remove(info_path)
+                console.print(f"[dim]已清理文件: {info_path}[/dim]")
+
         if all_deleted_successfully:
             if len(server_ids_to_delete) == args.num_instances :
                  console.print(f"[bold green]✓ 测试完成: {len(server_ids_to_delete)} 个实例全部创建并成功删除![/bold green]")
@@ -454,5 +676,6 @@ def main():
             console.print(f"[bold red]✗ 测试失败: 部分或全部实例 (共 {len(server_ids_to_delete)} 个尝试删除) 删除失败.[/bold red]")
     else:
         console.print("[red]⚠ 没有实例创建成功，因此不执行删除操作.[/red]")
+
 if __name__ == "__main__":
     main()
