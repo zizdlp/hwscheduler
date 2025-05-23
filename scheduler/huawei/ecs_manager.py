@@ -73,46 +73,62 @@ class SSHConfigurator:
 
     def configure_node(self, node, initial_key_path, user, nodes, private_key):
         """配置单个节点的SSH免密登录"""
-        try:
-            with Connection(
-                host=node['public_ip'],
-                user=user,
-                connect_kwargs={"key_filename": initial_key_path},
-                connect_timeout=30
-            ) as conn:
-                # 更新hosts文件
-                self.clean_and_update_hosts(conn, nodes)
-                
-                # 配置SSH目录和权限
-                conn.run("mkdir -p ~/.ssh && chmod 700 ~/.ssh", hide=True)
-                
-                # 上传密钥
-                with open(private_key, 'rb') as f:
-                    conn.put(f, remote="/tmp/id_rsa_temp")
-                conn.run("mv /tmp/id_rsa_temp ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa", hide=True)
-                
-                with open(f"{private_key}.pub", 'rb') as f:
-                    conn.put(f, remote="/tmp/id_rsa_temp.pub")
-                conn.run("mv /tmp/id_rsa_temp.pub ~/.ssh/id_rsa.pub && chmod 644 ~/.ssh/id_rsa.pub", hide=True)
-                
-                # 配置authorized_keys
-                conn.run("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys", hide=True)
-                
-                # 配置SSH客户端
-                ssh_config = """
-Host *
-    StrictHostKeyChecking no
-    UserKnownHostsFile /dev/null
-    LogLevel ERROR
-"""
-                conn.run(f"echo '{ssh_config}' > ~/.ssh/config && chmod 600 ~/.ssh/config", hide=True)
-                
-                console.print(f"[green]✓ 已配置 {node['hostname']} 的SSH免密登录[/green]")
-                return True
-        except Exception as e:
-            console.print(f"[red]✗ 配置 {node['hostname']} 失败: {str(e)}[/red]")
-            return False
-
+        max_retries = 3
+        retry_delay = 10  # 秒
+        
+        for attempt in range(max_retries):
+            try:
+                with Connection(
+                    host=node['public_ip'],
+                    user=user,
+                    connect_kwargs={
+                        "key_filename": initial_key_path,
+                        "timeout": 30,  # 增加超时时间
+                        "banner_timeout": 60,  # 增加banner超时
+                        "auth_timeout": 30  # 认证超时
+                    },
+                    connect_timeout=30
+                ) as conn:
+                    # 先执行一个简单的命令测试连接是否真正可用
+                    conn.run("echo 'Testing SSH connection'", hide=True, warn=True)
+                    
+                    # 更新hosts文件
+                    self.clean_and_update_hosts(conn, nodes)
+                    
+                    # 配置SSH目录和权限
+                    conn.run("mkdir -p ~/.ssh && chmod 700 ~/.ssh", hide=True)
+                    
+                    # 上传密钥
+                    with open(private_key, 'rb') as f:
+                        conn.put(f, remote="/tmp/id_rsa_temp")
+                    conn.run("mv /tmp/id_rsa_temp ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa", hide=True)
+                    
+                    with open(f"{private_key}.pub", 'rb') as f:
+                        conn.put(f, remote="/tmp/id_rsa_temp.pub")
+                    conn.run("mv /tmp/id_rsa_temp.pub ~/.ssh/id_rsa.pub && chmod 644 ~/.ssh/id_rsa.pub", hide=True)
+                    
+                    # 配置authorized_keys
+                    conn.run("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys", hide=True)
+                    
+                    # 配置SSH客户端
+                    ssh_config = """
+    Host *
+        StrictHostKeyChecking no
+        UserKnownHostsFile /dev/null
+        LogLevel ERROR
+    """
+                    conn.run(f"echo '{ssh_config}' > ~/.ssh/config && chmod 600 ~/.ssh/config", hide=True)
+                    
+                    console.print(f"[green]✓ 已配置 {node['hostname']} 的SSH免密登录[/green]")
+                    return True
+                    
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    console.print(f"[yellow]⚠ 配置 {node['hostname']} 失败 (尝试 {attempt + 1}/{max_retries}): {str(e)}[/yellow]")
+                    time.sleep(retry_delay)
+                    continue
+                console.print(f"[red]✗ 配置 {node['hostname']} 失败: {str(e)}[/red]")
+                return False
     def configure_cluster_pwdless(self, nodes_info, initial_key_path, user="root"):
         """配置整个集群的免密登录"""
         if not nodes_info:
@@ -744,7 +760,6 @@ def main():
                 instance_index, task_id = futures[future]
                 try:
                     instance_detail = future.result()
-                    print("instance_detail:",instance_detail)
                     if instance_detail:
                         created_instances_details.append(instance_detail)
                     else:
