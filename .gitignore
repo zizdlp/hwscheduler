@@ -2,4 +2,6 @@
 *.pem
 cache/
 venv/
+dist/
+*.egg-info/
 __pycache__/
