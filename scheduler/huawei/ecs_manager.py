@@ -75,7 +75,7 @@ class SSHConfigurator:
         """配置单个节点的SSH免密登录"""
         max_retries = 3
         retry_delay = 10  # 秒
-        
+        print("mydebug:configure_node:",node['public_ip'],user,initial_key_path)
         for attempt in range(max_retries):
             try:
                 with Connection(
@@ -83,12 +83,11 @@ class SSHConfigurator:
                     user=user,
                     connect_kwargs={
                         "key_filename": initial_key_path,
-                        "timeout": 30,  # 增加超时时间
-                        "banner_timeout": 60,  # 增加banner超时
-                        "auth_timeout": 30  # 认证超时
-                    },
-                    connect_timeout=30
+                    }
                 ) as conn:
+                    # Test the connection (optional, but recommended)
+                    conn.run("uname -a", hide=True)  # Run a simple command to verify connection
+                    print(f"Successfully connected to {node['public_ip']} as {user} using key: {initial_key_path}")
                     # 先执行一个简单的命令测试连接是否真正可用
                     conn.run("echo 'Testing SSH connection'", hide=True, warn=True)
                     
@@ -792,11 +791,11 @@ def main():
             console.rule("[bold blue]配置SSH免密登录[/bold blue]")
             
             # 获取初始SSH密钥路径（从参数或默认位置）
-            initial_key_path = os.path.expanduser("~/.ssh/id_rsa")  # 默认使用用户的SSH密钥
-            if args.key_pair:
-                # 如果是华为云的密钥对，可能需要从特定位置获取
-                initial_key_path = os.path.expanduser(f"~/.ssh/{args.key_pair}.pem")
-            
+            # initial_key_path = os.path.expanduser("~/.ssh/id_rsa")  # 默认使用用户的SSH密钥
+            # if args.key_pair:
+            #     # 如果是华为云的密钥对，可能需要从特定位置获取
+            #     initial_key_path = os.path.expanduser(f"~/.ssh/{args.key_pair}.pem")
+            initial_key_path="/Users/zz/github/schedule/KeyPair-loacl.pem"
             # 配置免密登录
             ssh_success = manager.ssh_configurator.configure_cluster_pwdless(
                 created_instances_details,
@@ -832,7 +831,7 @@ def main():
         eip_ids_to_delete = [inst['eip_id'] for inst in created_instances_details if inst.get('eip_id')]
         
         console.rule("[bold red]自动删除模式[/bold red]")
-        wait_seconds = 10 
+        wait_seconds = 30
         console.print(f"[yellow]等待 {wait_seconds} 秒后自动删除 {len(server_ids_to_delete)} 个已创建的实例...[/yellow]")
         for i in range(wait_seconds, 0, -1):
             print(f"\r[yellow]开始删除倒计时: {i}s...[/yellow]", end="")

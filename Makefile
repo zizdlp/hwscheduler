@@ -21,7 +21,7 @@ deleteServerGroup:
 	 	--ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} \
 		--server-ids "9c9003e3-97c5-4ac8-9141-e4c9d6c96dae"
 test_login:
-	python hw/fabricLogin.py --host ${MASTER} --key_path ${HW_SDK_KEYPEM}.pem --user root
+	python -m scheduler.huawei.fabric_login --host ${MASTER} --key_path ${HW_SDK_KEYPEM}.pem --user root
 start_container:
 	docker run -itd --name temp_schedule -v ./:/mnt/schedule ubuntu:22.04 /bin/bash
 use_container:
