@@ -115,3 +115,15 @@ test_ecs_manager:
 		--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
 		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
 		--num-instances 4 --instance-type kc1.large.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1001 --task-type spark --actor admin --use-ip
+task_build_chukonu2:
+	python -m scheduler.tasks.task_build_chukonu2  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
+		--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
+		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
+		--ami 27164e55-d72c-4611-8c74-3e4227197cae \
+		--num-instances 1 --instance-type kc1.large.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1 --task-type build-chukonu --actor zizdlp --use-ip
+task_spark_base2:
+	python -m scheduler.tasks.task_spark_base2  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
+		--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
+		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
+		--ami 704106a0-5ab8-491c-8403-73041fca5f54 \
+		--num-instances 1 --instance-type kc1.large.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1 --task-type spark-base-kubernetes --actor zizdlp --use-ip
