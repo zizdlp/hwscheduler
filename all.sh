@@ -1,39 +1,16 @@
 #!/bin/bash
 
+# 加载环境变量
+set -a  # 自动导出所有变量
+source .env
+set +a
+
 # Define your task types with proper quoting
 task_types=(
-    # "kubernetes"
-    # "streaming"
-    # "catalyst"
     "hive-thriftserver-1"
     "hive-thriftserver-2"
-    # "hive-thriftserver-3"
-    # "hive-thriftserver-4"
-    # "hive-thriftserver-5"
-    # "sql-kafka-0-10"
-    # "streaming-kafka-0-10"
-    # "mesos"
-    # "yarn"
-    # "hadoop-cloud"
-    # "connect"
-    # "hive-1"
-    # "hive-2"
-    # "hive-3"
-    # "sql-a-1"
-    # "sql-a-2"
-    # "sql-a-3"
-    # "sql-a-4"
-    # "sql-a-5"
-    # "sql-a-6"
-    # "sql-a-7"
-    # "sql-b-1"
-    # "sql-b-2"
-    # "sql-c-1"
-    # "sql-c-2"
-    # "sql-c-3"
-    # "sql-c-4"
-    # "sql-c-5"
 )
+
 # Initialize Conda properly
 CONDA_SETUP='
 export PATH="/root/miniconda3/bin:$PATH"
@@ -48,6 +25,9 @@ for task_type in "${task_types[@]}"; do
     # Create tmux session with full environment setup
     tmux new-session -d -s "$session_name" \
         "bash -c \"
+        set -a
+        source .env
+        set +a
         export PATH=\\\"/root/miniconda3/bin:\\\$PATH\\\"
         source /root/miniconda3/etc/profile.d/conda.sh
         conda activate py10
