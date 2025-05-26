@@ -128,5 +128,4 @@ task_spark_base2:
 		--ami 704106a0-5ab8-491c-8403-73041fca5f54 \
 		--num-instances 1 --instance-type kc1.2xlarge.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1 --task-type spark-base-kubernetes --actor zizdlp --use-ip
 build_wheel:
-	pip install --upgrade pip setuptools wheel build
 	python -m build
