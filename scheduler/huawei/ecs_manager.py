@@ -21,7 +21,7 @@ from huaweicloudsdkecs.v2 import *
 from huaweicloudsdkeip.v2.region.eip_region import EipRegion
 from huaweicloudsdkeip.v2 import *
 from huaweicloudsdkcore.exceptions import exceptions
-
+from scheduler.huawei.fabric_login import connect_with_key
 console = Console()
 
 # 添加新的SSH配置类
@@ -75,7 +75,8 @@ class SSHConfigurator:
         """配置单个节点的SSH免密登录"""
         max_retries = 3
         retry_delay = 10  # 秒
-        print("mydebug:configure_node:",node['public_ip'],user,initial_key_path)
+        time.sleep(30)
+        print("mydebug:configure node:",node['public_ip'],user,initial_key_path)
         for attempt in range(max_retries):
             try:
                 with Connection(
@@ -86,8 +87,6 @@ class SSHConfigurator:
                     }
                 ) as conn:
                     # Test the connection (optional, but recommended)
-                    conn.run("uname -a", hide=True)  # Run a simple command to verify connection
-                    print(f"Successfully connected to {node['public_ip']} as {user} using key: {initial_key_path}")
                     # 先执行一个简单的命令测试连接是否真正可用
                     conn.run("echo 'Testing SSH connection'", hide=True, warn=True)
                     
@@ -831,7 +830,7 @@ def main():
         eip_ids_to_delete = [inst['eip_id'] for inst in created_instances_details if inst.get('eip_id')]
         
         console.rule("[bold red]自动删除模式[/bold red]")
-        wait_seconds = 30
+        wait_seconds = 10
         console.print(f"[yellow]等待 {wait_seconds} 秒后自动删除 {len(server_ids_to_delete)} 个已创建的实例...[/yellow]")
         for i in range(wait_seconds, 0, -1):
             print(f"\r[yellow]开始删除倒计时: {i}s...[/yellow]", end="")
