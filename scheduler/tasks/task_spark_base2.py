@@ -124,6 +124,7 @@ def test_spark_base(node, initial_key_path, user,task_name):
     except Exception as e:
         print(f"Error configuring master node {node}: {e}")
         return False
+
 def main():
     parser = argparse.ArgumentParser(
         description='华为云ECS实例创建后自动删除工具 (支持多实例)',
@@ -247,11 +248,10 @@ def main():
             f"{args.run_number}_{args.task_type}",
             created_instances_details
         )
+        initial_key_path = f"/root/schedule/{args.key_pair}.pem"
         # 配置SSH免密登录（仅在成功创建实例且有公网IP时）
         if args.use_ip and any(inst.get('public_ip', 'N/A') != 'N/A' for inst in created_instances_details):
             console.rule("[bold blue]配置SSH免密登录[/bold blue]")
-            
-            initial_key_path = f"/root/schedule/{args.key_pair}.pem"
             # 配置免密登录
             ssh_success = manager.ssh_configurator.configure_cluster_pwdless(
                 created_instances_details,
@@ -282,40 +282,41 @@ def main():
                 inst['status']
             )
         console.print(table)
-        test_spark_base(created_instances_details[0]['public_ip'],initial_key_path,"root","kubernetes")
+        print("call+====",created_instances_details[0]['private_ip'],initial_key_path)
+        test_spark_base(created_instances_details[0]['private_ip'],initial_key_path,"root",args.task_type)
         
-        server_ids_to_delete = [inst['id'] for inst in created_instances_details]
-        eip_ids_to_delete = [inst['eip_id'] for inst in created_instances_details if inst.get('eip_id')]
+        # server_ids_to_delete = [inst['id'] for inst in created_instances_details]
+        # eip_ids_to_delete = [inst['eip_id'] for inst in created_instances_details if inst.get('eip_id')]
         
-        console.rule("[bold red]自动删除模式[/bold red]")
-        wait_seconds = 10
-        console.print(f"[yellow]等待 {wait_seconds} 秒后自动删除 {len(server_ids_to_delete)} 个已创建的实例...[/yellow]")
-        for i in range(wait_seconds, 0, -1):
-            print(f"\r[yellow]开始删除倒计时: {i}s...[/yellow]", end="")
-            time.sleep(1)
-        print("\r" + " " * 30 + "\r", end="") 
+        # console.rule("[bold red]自动删除模式[/bold red]")
+        # wait_seconds = 10
+        # console.print(f"[yellow]等待 {wait_seconds} 秒后自动删除 {len(server_ids_to_delete)} 个已创建的实例...[/yellow]")
+        # for i in range(wait_seconds, 0, -1):
+        #     print(f"\r[yellow]开始删除倒计时: {i}s...[/yellow]", end="")
+        #     time.sleep(1)
+        # print("\r" + " " * 30 + "\r", end="") 
 
-        # 先删除实例
-        all_deleted_successfully = manager.delete_instances(server_ids_to_delete)
+        # # 先删除实例
+        # all_deleted_successfully = manager.delete_instances(server_ids_to_delete)
         
-        # 然后删除EIP
-        if eip_ids_to_delete:
-            console.print("[cyan]开始清理关联的EIP...[/cyan]")
-            manager.eip_manager.delete_eips(eip_ids_to_delete)
+        # # 然后删除EIP
+        # if eip_ids_to_delete:
+        #     console.print("[cyan]开始清理关联的EIP...[/cyan]")
+        #     manager.eip_manager.delete_eips(eip_ids_to_delete)
             
-            # 清理文件
-            info_path = f"./cache/{args.run_number}_{args.task_type}_ip_info.txt"
-            if os.path.exists(info_path):
-                os.remove(info_path)
-                console.print(f"[dim]已清理文件: {info_path}[/dim]")
+        #     # 清理文件
+        #     info_path = f"./cache/{args.run_number}_{args.task_type}_ip_info.txt"
+        #     if os.path.exists(info_path):
+        #         os.remove(info_path)
+        #         console.print(f"[dim]已清理文件: {info_path}[/dim]")
 
-        if all_deleted_successfully:
-            if len(server_ids_to_delete) == args.num_instances :
-                 console.print(f"[bold green]✓ 测试完成: {len(server_ids_to_delete)} 个实例全部创建并成功删除![/bold green]")
-            else:
-                 console.print(f"[bold green]✓ 测试部分完成: {len(server_ids_to_delete)}/{args.num_instances} 个实例创建并成功删除! (其余实例创建失败)[/bold green]")
-        else:
-            console.print(f"[bold red]✗ 测试失败: 部分或全部实例 (共 {len(server_ids_to_delete)} 个尝试删除) 删除失败.[/bold red]")
+        # if all_deleted_successfully:
+        #     if len(server_ids_to_delete) == args.num_instances :
+        #          console.print(f"[bold green]✓ 测试完成: {len(server_ids_to_delete)} 个实例全部创建并成功删除![/bold green]")
+        #     else:
+        #          console.print(f"[bold green]✓ 测试部分完成: {len(server_ids_to_delete)}/{args.num_instances} 个实例创建并成功删除! (其余实例创建失败)[/bold green]")
+        # else:
+        #     console.print(f"[bold red]✗ 测试失败: 部分或全部实例 (共 {len(server_ids_to_delete)} 个尝试删除) 删除失败.[/bold red]")
     else:
         console.print("[red]⚠ 没有实例创建成功，因此不执行删除操作.[/red]")
 
