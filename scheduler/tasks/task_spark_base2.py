@@ -247,27 +247,28 @@ def main():
             f"{args.run_number}_{args.task_type}",
             created_instances_details
         )
+        initial_key_path="/Users/zz/github/schedule/KeyPair-loacl.pem"
         # 配置SSH免密登录（仅在成功创建实例且有公网IP时）
-        if args.use_ip and any(inst.get('public_ip', 'N/A') != 'N/A' for inst in created_instances_details):
-            console.rule("[bold blue]配置SSH免密登录[/bold blue]")
+        # if args.use_ip and any(inst.get('public_ip', 'N/A') != 'N/A' for inst in created_instances_details):
+        #     console.rule("[bold blue]配置SSH免密登录[/bold blue]")
             
-            # 获取初始SSH密钥路径（从参数或默认位置）
-            # initial_key_path = os.path.expanduser("~/.ssh/id_rsa")  # 默认使用用户的SSH密钥
-            # if args.key_pair:
-            #     # 如果是华为云的密钥对，可能需要从特定位置获取
-            #     initial_key_path = os.path.expanduser(f"~/.ssh/{args.key_pair}.pem")
-            initial_key_path="/Users/zz/github/schedule/KeyPair-loacl.pem"
-            # 配置免密登录
-            ssh_success = manager.ssh_configurator.configure_cluster_pwdless(
-                created_instances_details,
-                initial_key_path=initial_key_path,
-                user="root"
-            )
+        #     # 获取初始SSH密钥路径（从参数或默认位置）
+        #     # initial_key_path = os.path.expanduser("~/.ssh/id_rsa")  # 默认使用用户的SSH密钥
+        #     # if args.key_pair:
+        #     #     # 如果是华为云的密钥对，可能需要从特定位置获取
+        #     #     initial_key_path = os.path.expanduser(f"~/.ssh/{args.key_pair}.pem")
+        #     initial_key_path="/Users/zz/github/schedule/KeyPair-loacl.pem"
+        #     # 配置免密登录
+        #     ssh_success = manager.ssh_configurator.configure_cluster_pwdless(
+        #         created_instances_details,
+        #         initial_key_path=initial_key_path,
+        #         user="root"
+        #     )
             
-            if ssh_success:
-                console.print("[bold green]✓ SSH免密登录配置成功![/bold green]")
-            else:
-                console.print("[yellow]⚠ SSH免密登录配置部分失败[/yellow]")
+        #     if ssh_success:
+        #         console.print("[bold green]✓ SSH免密登录配置成功![/bold green]")
+        #     else:
+        #         console.print("[yellow]⚠ SSH免密登录配置部分失败[/yellow]")
         
         
         table = Table(title="已创建实例列表 (等待删除)", show_header=True, header_style="bold green")
