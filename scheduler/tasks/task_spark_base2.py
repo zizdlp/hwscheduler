@@ -116,8 +116,59 @@ def test_spark_base(node, initial_key_path, user,task_name):
             return True
             
     except Exception as e:
-        print(f"Error configuring master node {node}: {e}")
+        print(f"Error configuring master node in test_spark_base: {node}: {e}")
         return False
+def test_build_chukonu(node, initial_key_path, user):
+    """
+    Build and install Chukonu on the specified node
+    """
+    try:
+        with Connection(
+            host=node,
+            user=user,
+            connect_kwargs={"key_filename": initial_key_path},
+        ) as conn:
+            # 设置环境变量（对所有后续命令生效）
+            conn.config.run.env = {
+                'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-arm64',
+                'CHUKONU_HOME': '/root/chukonu/install',
+                'LD_LIBRARY_PATH': '/root/chukonu/install/lib:/tmp/cache',
+                'CHUKONU_TEMP': '/tmp',
+                'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'  # 确保基本PATH设置
+            }
+            
+            # 创建必要目录
+            conn.run("mkdir -p /tmp/staging /tmp/cache /root/chukonu/build /root/chukonu/install")
+            conn.run("cd /root/chukonu && git pull && git checkout v1.1.0")
+            # 在/tmp下创建带时间戳的测试日志目录
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            test_logs_dir = f"/tmp/chukonu_test_logs_{timestamp}"
+            conn.run(f"mkdir -p {test_logs_dir}")
+            
+            commands = [
+                # Build Scala components
+                'cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt package',
+                'cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt assembly',
+                
+                # Create build directory and configure
+                'cd /root/chukonu/build && cmake .. -DCMAKE_BUILD_TYPE=Debug -DWITH_ASAN=OFF -DWITH_JEMALLOC=OFF -DCMAKE_INSTALL_PREFIX="$CHUKONU_HOME"',
+                
+                # Build and install
+                'cd /root/chukonu/build && make install -j4',
+            ]
+            
+            for cmd in commands:
+                print(f"Executing on {node}: {cmd}")
+                result = conn.run(cmd, warn=True)
+                if not result.ok:
+                    print(f"Command failed on {node}: {cmd}")
+                    return False
+            return True
+            
+    except Exception as e:
+        print(f"Error configuring master node in test_build_chukonu: {node}: {e}")
+        return False
+
 def main():
     parser = argparse.ArgumentParser(
         description='华为云ECS实例创建后自动删除工具 (支持多实例)',
@@ -282,6 +333,7 @@ def main():
                 inst['status']
             )
         console.print(table)
+        test_build_chukonu(created_instances_details[0]['public_ip'],initial_key_path,"root")
         test_spark_base(created_instances_details[0]['public_ip'],initial_key_path,"root",args.task_type)
         
         server_ids_to_delete = [inst['id'] for inst in created_instances_details]
