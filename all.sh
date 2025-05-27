@@ -4,16 +4,16 @@
 # kubernetes, streaming, catalyst, hive-thriftserver-1, hive-thriftserver-2, hive-thriftserver-3, hive-thriftserver-4, hive-thriftserver-5, sql-kafka-0-10, streaming-kafka-0-10, mesos, yarn, hadoop-cloud, connect, hive-1, hive-2, hive-3, sql-a-1, sql-a-2, sql-a-3, sql-a-4, sql-a-5, sql-a-6, sql-a-7, sql-b-1, sql-b-2, sql-c-1, sql-c-2, sql-c-3, sql-c-4, sql-c-5
 
 # 定义任务类型数组
-TASK_TYPES=("kubernetes" "streaming" "catalyst" "hive-thriftserver-1" "hive-thriftserver-2" "hive-thriftserver-3" "hive-thriftserver-4" "hive-thriftserver-5" "sql-kafka-0-10" "streaming-kafka-0-10" "mesos" "yarn" "hadoop-cloud" "connect" "hive-1" "hive-2" "hive-3" "sql-a-1" "sql-a-2" "sql-a-3" "sql-a-4" "sql-a-5" "sql-a-6" "sql-a-7" "sql-b-1" "sql-b-2" "sql-c-1" "sql-c-2" "sql-c-3" "sql-c-4" "sql-c-5")
+TASK_TYPES=("kubernetes" "streaming" "catalyst" "hive-thriftserver-1")
 
 echo "=====================================================
 准备启动 31 个 Spark 任务...
 ====================================================="
 
 # 加载环境变量
-if [ -f "~/.env" ]; then
-    echo "正在加载环境变量: ~/.env"
-    source "~/.env"
+if [ -f ".env" ]; then
+    echo "正在加载环境变量: .env"
+    source ".env"
 else
     echo "警告: 环境变量文件 ~/.env 不存在!"
 fi

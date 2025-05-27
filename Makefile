@@ -139,3 +139,5 @@ task_spark_UT:
 		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
 		--ami 704106a0-5ab8-491c-8403-73041fca5f54 \
 		--num-instances 1 --instance-type kc1.xlarge.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1 --task-type yarn --actor zizdlp --use-ip
+kill_all:
+	tmux kill-server
