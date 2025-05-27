@@ -126,3 +126,9 @@ task_spark_base2:
 		--num-instances 1 --instance-type kc1.xlarge.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1 --task-type yarn --actor zizdlp --use-ip
 build_wheel:
 	python -m build
+
+test_abc:
+	tmux new-session -d -s yarn
+	tmux send-keys -t yarn 'conda activate py10' C-m
+	tmux send-keys -t yarn 'cd ~/schedule && make task_spark_base2' C-m
+	tmux attach-session -t yarn
