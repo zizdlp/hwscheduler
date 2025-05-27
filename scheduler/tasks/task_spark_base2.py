@@ -41,7 +41,7 @@ def test_spark_base(node, initial_key_path, user,task_name):
             
             # Create timestamped test logs directory
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            test_logs_dir = f"/tmp/chukonu_test_logs_{timestamp}"
+            test_logs_dir = f"/tmp/chukonu_spark_test_logs_{timestamp}"
             conn.run(f"mkdir -p {test_logs_dir}")
             
             commands = [
@@ -74,10 +74,12 @@ def test_spark_base(node, initial_key_path, user,task_name):
             # Using tee to capture output while still seeing it in real-time
             # Using nohup to prevent hanging if the connection drops
             result = conn.run(
-                f'cd /root/spark && bash -c "./dev/run-tests --parallelism 1 --modules {task_name} > {ctest_log} 2>&1"'
-            )
+                f'cd /root/spark && bash -c "./dev/run-tests --parallelism 1 --modules {task_name} > {ctest_log} 2>&1"',
+            warn=True)
+            
+            if not result.ok:
+                print(f"Warning: Command failed on {node}: {cmd}")
 
-         
             # Verify test results and print statistics
             print(f"\nChecking test results in {ctest_log}...")
 
@@ -142,7 +144,7 @@ def test_build_chukonu(node, initial_key_path, user):
             conn.run("cd /root/chukonu && git pull && git checkout v1.1.0")
             # 在/tmp下创建带时间戳的测试日志目录
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            test_logs_dir = f"/tmp/chukonu_test_logs_{timestamp}"
+            test_logs_dir = f"/tmp/chukonu_build_chukonu_logs_{timestamp}"
             conn.run(f"mkdir -p {test_logs_dir}")
             
             commands = [
@@ -292,7 +294,7 @@ def main():
             f"{args.run_number}_{args.task_type}",
             created_instances_details
         )
-        initial_key_path="/Users/zz/github/schedule/KeyPair-loacl.pem"
+        initial_key_path="/root/schedule/KeyPair-loacl.pem"
         # 配置SSH免密登录（仅在成功创建实例且有公网IP时）
         # if args.use_ip and any(inst.get('public_ip', 'N/A') != 'N/A' for inst in created_instances_details):
         #     console.rule("[bold blue]配置SSH免密登录[/bold blue]")
@@ -302,7 +304,7 @@ def main():
         #     # if args.key_pair:
         #     #     # 如果是华为云的密钥对，可能需要从特定位置获取
         #     #     initial_key_path = os.path.expanduser(f"~/.ssh/{args.key_pair}.pem")
-        #     initial_key_path="/Users/zz/github/schedule/KeyPair-loacl.pem"
+        #     initial_key_path="/root/schedule/KeyPair-loacl.pem"
         #     # 配置免密登录
         #     ssh_success = manager.ssh_configurator.configure_cluster_pwdless(
         #         created_instances_details,
@@ -347,27 +349,27 @@ def main():
             time.sleep(1)
         print("\r" + " " * 30 + "\r", end="") 
 
-        # 先删除实例
-        all_deleted_successfully = manager.delete_instances(server_ids_to_delete)
+        # # 先删除实例
+        # all_deleted_successfully = manager.delete_instances(server_ids_to_delete)
         
-        # 然后删除EIP
-        if eip_ids_to_delete:
-            console.print("[cyan]开始清理关联的EIP...[/cyan]")
-            manager.eip_manager.delete_eips(eip_ids_to_delete)
+        # # 然后删除EIP
+        # if eip_ids_to_delete:
+        #     console.print("[cyan]开始清理关联的EIP...[/cyan]")
+        #     manager.eip_manager.delete_eips(eip_ids_to_delete)
             
-            # 清理文件
-            info_path = f"./cache/{args.run_number}_{args.task_type}_ip_info.txt"
-            if os.path.exists(info_path):
-                os.remove(info_path)
-                console.print(f"[dim]已清理文件: {info_path}[/dim]")
+        #     # 清理文件
+        #     info_path = f"./cache/{args.run_number}_{args.task_type}_ip_info.txt"
+        #     if os.path.exists(info_path):
+        #         os.remove(info_path)
+        #         console.print(f"[dim]已清理文件: {info_path}[/dim]")
 
-        if all_deleted_successfully:
-            if len(server_ids_to_delete) == args.num_instances :
-                 console.print(f"[bold green]✓ 测试完成: {len(server_ids_to_delete)} 个实例全部创建并成功删除![/bold green]")
-            else:
-                 console.print(f"[bold green]✓ 测试部分完成: {len(server_ids_to_delete)}/{args.num_instances} 个实例创建并成功删除! (其余实例创建失败)[/bold green]")
-        else:
-            console.print(f"[bold red]✗ 测试失败: 部分或全部实例 (共 {len(server_ids_to_delete)} 个尝试删除) 删除失败.[/bold red]")
+        # if all_deleted_successfully:
+        #     if len(server_ids_to_delete) == args.num_instances :
+        #          console.print(f"[bold green]✓ 测试完成: {len(server_ids_to_delete)} 个实例全部创建并成功删除![/bold green]")
+        #     else:
+        #          console.print(f"[bold green]✓ 测试部分完成: {len(server_ids_to_delete)}/{args.num_instances} 个实例创建并成功删除! (其余实例创建失败)[/bold green]")
+        # else:
+        #     console.print(f"[bold red]✗ 测试失败: 部分或全部实例 (共 {len(server_ids_to_delete)} 个尝试删除) 删除失败.[/bold red]")
     else:
         console.print("[red]⚠ 没有实例创建成功，因此不执行删除操作.[/red]")
 

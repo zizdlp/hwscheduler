@@ -158,7 +158,7 @@ def main():
             # if args.key_pair:
             #     # 如果是华为云的密钥对，可能需要从特定位置获取
             #     initial_key_path = os.path.expanduser(f"~/.ssh/{args.key_pair}.pem")
-            initial_key_path="/Users/zz/github/schedule/KeyPair-loacl.pem"
+            initial_key_path="/root/schedule/KeyPair-loacl.pem"
             # 配置免密登录
             ssh_success = manager.ssh_configurator.configure_cluster_pwdless(
                 created_instances_details,
