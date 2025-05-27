@@ -95,7 +95,7 @@ pwd_less:
 	python3 hw/config_pwdless.py --cluster-info "./cache/spark_nodes_info.txt"  --key_path ${HW_SDK_KEYPEM}.pem
 
 login_a:
-	ssh -i ${HW_SDK_KEYPEM}.pem  root@110.238.105.253
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@101.44.161.156
  
  
 
@@ -126,6 +126,6 @@ task_spark_base2:
 		--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
 		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
 		--ami 704106a0-5ab8-491c-8403-73041fca5f54 \
-		--num-instances 1 --instance-type kc1.xlarge.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1 --task-type spark-base-kubernetes --actor zizdlp --use-ip
+		--num-instances 1 --instance-type kc1.xlarge.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1 --task-type mesos --actor zizdlp --use-ip
 build_wheel:
 	python -m build

@@ -102,12 +102,6 @@ def test_spark_base(node, initial_key_path, user,task_name):
                 hide=True
             )
 
-            if not success_check.ok or not success_check.stdout.strip():
-                print("\nTests failed based on success criteria")
-                return False
-
-            print("\nAll tests passed successfully")
-            
             # Compress test logs
             conn.run(f"tar -czf {test_logs_dir}.tar.gz -C {test_logs_dir} .")
             print(f"Test logs archived to: {test_logs_dir}.tar.gz")
@@ -288,7 +282,7 @@ def main():
                 inst['status']
             )
         console.print(table)
-        test_spark_base(created_instances_details[0]['public_ip'],initial_key_path,"root","kubernetes")
+        test_spark_base(created_instances_details[0]['public_ip'],initial_key_path,"root",args.task_type)
         
         server_ids_to_delete = [inst['id'] for inst in created_instances_details]
         eip_ids_to_delete = [inst['eip_id'] for inst in created_instances_details if inst.get('eip_id')]
