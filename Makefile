@@ -132,3 +132,10 @@ test_abc:
 	tmux send-keys -t yarn 'conda activate py10' C-m
 	tmux send-keys -t yarn 'cd ~/schedule && make task_spark_base2' C-m
 	tmux attach-session -t yarn
+
+task_spark_UT:
+	python -m scheduler.tasks.task_spark_base2  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
+		--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
+		--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
+		--ami 704106a0-5ab8-491c-8403-73041fca5f54 \
+		--num-instances 1 --instance-type kc1.xlarge.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1 --task-type yarn --actor zizdlp --use-ip

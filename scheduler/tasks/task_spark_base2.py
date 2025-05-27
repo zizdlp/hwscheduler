@@ -17,6 +17,57 @@ from huaweicloudsdkeip.v2 import *
 from scheduler.huawei.ecs_manager import ECSInstanceManager,save_eips_to_file
 console = Console()
 
+# 首先定义不同任务对应的命令模板
+def get_test_command(task_name):
+    if task_name == "hive-1":
+        return './dev/run-tests --parallelism 1 --modules hive --included-tags "org.apache.spark.tags.HivePartOneTest,org.apache.spark.tags.HivePartTwoTest"'
+    elif task_name == "hive-2":
+        return './dev/run-tests --parallelism 1 --modules hive --included-tags org.apache.spark.tags.SlowHiveTest'
+    elif task_name == "hive-3":
+        return './dev/run-tests --parallelism 1 --modules hive --excluded-tags "org.apache.spark.tags.HivePartOneTest,org.apache.spark.tags.HivePartTwoTest,org.apache.spark.tags.SlowHiveTest"'
+    elif task_name == "hive-thriftserver-1":
+        return './dev/run-tests --parallelism 1 --modules hive-thriftserver --included-tags org.apache.spark.tags.HiveThriftServerPartOneTest'
+    elif task_name == "hive-thriftserver-2":
+        return './dev/run-tests --parallelism 1 --modules hive-thriftserver --included-tags org.apache.spark.tags.HiveThriftServerPartTwoTest'
+    elif task_name == "hive-thriftserver-3":
+        return './dev/run-tests --parallelism 1 --modules hive-thriftserver --included-tags org.apache.spark.tags.HiveThriftServerPartThreeTest'
+    elif task_name == "hive-thriftserver-4":
+        return './dev/run-tests --parallelism 1 --modules hive-thriftserver --included-tags org.apache.spark.tags.HiveThriftServerPartFourTest'
+    elif task_name == "hive-thriftserver-5":
+        return './dev/run-tests --parallelism 1 --modules hive-thriftserver --excluded-tags "org.apache.spark.tags.HiveThriftServerPartOneTest,org.apache.spark.tags.HiveThriftServerPartTwoTest,org.apache.spark.tags.HiveThriftServerPartThreeTest,org.apache.spark.tags.HiveThriftServerPartFourTest"'
+    elif task_name == "sql-a-1":
+        return './dev/run-tests --parallelism 1 --modules sql --included-tags org.apache.spark.tags.ExtendedSQLPartOneTest'
+    elif task_name == "sql-a-2":
+        return './dev/run-tests --parallelism 1 --modules sql --included-tags org.apache.spark.tags.ExtendedSQLPartTwoTest'
+    elif task_name == "sql-a-3":
+        return './dev/run-tests --parallelism 1 --modules sql --included-tags org.apache.spark.tags.ExtendedSQLPartThreeTest'
+    elif task_name == "sql-a-4":
+        return './dev/run-tests --parallelism 1 --modules sql --included-tags org.apache.spark.tags.ExtendedSQLPartFourTest'
+    elif task_name == "sql-a-5":
+        return './dev/run-tests --parallelism 1 --modules sql --included-tags org.apache.spark.tags.ExtendedSQLPartFiveTest'
+    elif task_name == "sql-a-6":
+        return './dev/run-tests --parallelism 1 --modules sql --included-tags org.apache.spark.tags.ExtendedSQLPartSixTest'
+    elif task_name == "sql-a-7":
+        return './dev/run-tests --parallelism 1 --modules sql --included-tags org.apache.spark.tags.ExtendedSQLPartZeroTest'
+    elif task_name == "sql-b-1":
+        return './dev/run-tests --parallelism 1 --modules sql --included-tags org.apache.spark.tags.SlowSQLPartOneTest'
+    elif task_name == "sql-b-2":
+        return './dev/run-tests --parallelism 1 --modules sql --included-tags org.apache.spark.tags.SlowSQLPartTwoTest'
+    elif task_name == "sql-c-1":
+        return './dev/run-tests --parallelism 1 --modules sql --included-tags org.apache.spark.tags.SplitSQLPartOneTest'
+    elif task_name == "sql-c-2":
+        return './dev/run-tests --parallelism 1 --modules sql --included-tags org.apache.spark.tags.SplitSQLPartTwoTest'
+    elif task_name == "sql-c-3":
+        return './dev/run-tests --parallelism 1 --modules sql --included-tags org.apache.spark.tags.SplitSQLPartThreeTest'
+    elif task_name == "sql-c-4":
+        return './dev/run-tests --parallelism 1 --modules sql --included-tags org.apache.spark.tags.SplitSQLPartFourTest'
+    elif task_name == "sql-c-5":
+        return './dev/run-tests --parallelism 1 --modules sql --excluded-tags "org.apache.spark.tags.ExtendedSQLPartOneTest,org.apache.spark.tags.ExtendedSQLPartTwoTest,org.apache.spark.tags.ExtendedSQLPartThreeTest,org.apache.spark.tags.ExtendedSQLPartFourTest,org.apache.spark.tags.ExtendedSQLPartFiveTest,org.apache.spark.tags.SlowSQLPartOneTest,org.apache.spark.tags.SlowSQLPartTwoTest,org.apache.spark.tags.SplitSQLPartOneTest,org.apache.spark.tags.SplitSQLPartTwoTest,org.apache.spark.tags.SplitSQLPartThreeTest,org.apache.spark.tags.SplitSQLPartFourTest,org.apache.spark.tags.ExtendedSQLPartZeroTest,org.apache.spark.tags.ExtendedSQLPartSixTest"'
+    else:
+        # 默认情况，直接使用模块名
+        return f'./dev/run-tests --parallelism 1 --modules {task_name}'
+
+
 def test_spark_base(node, initial_key_path, user,task_name):
     """
     Build and install Chukonu on the specified node
@@ -73,9 +124,13 @@ def test_spark_base(node, initial_key_path, user,task_name):
             # Run the command with proper output handling
             # Using tee to capture output while still seeing it in real-time
             # Using nohup to prevent hanging if the connection drops
+            
+            # 然后使用这个函数来构造命令
+            test_command = get_test_command(task_name)
             result = conn.run(
-                f'cd /root/spark && bash -c "./dev/run-tests --parallelism 1 --modules {task_name} > {ctest_log} 2>&1"',
-            warn=True)
+                f'cd /root/spark && bash -c "{test_command} > {ctest_log} 2>&1"',
+                warn=True
+            )
             
             if not result.ok:
                 print(f"Warning: Command failed on {node}: {cmd}")
