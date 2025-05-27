@@ -10,6 +10,14 @@ echo "=====================================================
 准备启动 31 个 Spark 任务...
 ====================================================="
 
+# 加载环境变量
+if [ -f "~/.env" ]; then
+    echo "正在加载环境变量: ~/.env"
+    source "~/.env"
+else
+    echo "警告: 环境变量文件 ~/.env 不存在!"
+fi
+
 # 循环处理每个任务类型
 for TASK_TYPE in "${TASK_TYPES[@]}"; do
     # 创建会话名
@@ -30,10 +38,16 @@ for TASK_TYPE in "${TASK_TYPES[@]}"; do
     tmux send-keys -t $SESSION_NAME 'conda activate py10' C-m
     
     # 发送命令以运行任务
-    FULL_COMMAND="cd ~/schedule && make task_spark_base2_$TASK_TYPE"
+    PYTHON_CMD="python -m scheduler.tasks.task_spark_base2 --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \\
+        --security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \\
+        --subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \\
+        --ami 704106a0-5ab8-491c-8403-73041fca5f54 \\
+        --num-instances 1 --instance-type kc1.xlarge.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1 --task-type $TASK_TYPE --actor zizdlp --use-ip"
+    
+    FULL_COMMAND="cd ~/schedule && $PYTHON_CMD"
     tmux send-keys -t $SESSION_NAME "$FULL_COMMAND" C-m
     
-    echo "✅ 会话 $SESSION_NAME 已启动并正在运行任务: $FULL_COMMAND"
+    echo "✅ 会话 $SESSION_NAME 已启动并正在运行任务: task_spark_base2 --task-type $TASK_TYPE"
     
     # 不是最后一个任务时，等待一段时间再启动下一个会话
     if [ ! "$TASK_TYPE" = "${TASK_TYPES[${#TASK_TYPES[@]}-1]}" ]; then
