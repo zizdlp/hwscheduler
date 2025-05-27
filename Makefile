@@ -96,9 +96,6 @@ pwd_less:
 
 login_a:
 	ssh -i ${HW_SDK_KEYPEM}.pem  root@101.44.161.156
- 
- 
-
 
 delete_server:
 	python3 hw/deleteServer.py
