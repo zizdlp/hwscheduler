@@ -6,7 +6,8 @@
 # 定义任务类型数组
 # TASK_TYPES=("catalyst" "connect" "hadoop-cloud" "kubernetes" "mesos" "streaming" "streaming-kafka-0-10" "yarn")
 # TASK_TYPES=("hive-thriftserver-1" "hive-thriftserver-2" "hive-thriftserver-3" "hive-thriftserver-4" "hive-thriftserver-5" "sql-a-1" "sql-a-2" "sql-a-3" "sql-a-4" "sql-a-5" "sql-a-6" "sql-a-7" "sql-b-1" "sql-b-2" "sql-c-1" "sql-c-2" "sql-c-3" "sql-c-4" "sql-c-5")
-TASK_TYPES=("sql-kafka-0-10")
+# TASK_TYPES=("sql-kafka-0-10")
+TASK_TYPES=("hive-1" "hive-2" "hive-3" "hive-thriftserver-4" "sql-a-4" "sql-c-2")
 echo "=====================================================
 准备启动 31 个 Spark 任务...
 ====================================================="
