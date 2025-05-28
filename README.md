@@ -30,3 +30,5 @@ curl -X POST \
   -H "Accept: application/vnd.github.v3+json" \
   "https://api.github.com/repos/chukonu-team/chukonu/actions/runners/registration-token"
 ```
+
+|name|result|
