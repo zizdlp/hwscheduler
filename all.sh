@@ -5,8 +5,8 @@
 
 # 定义任务类型数组
 # TASK_TYPES=("catalyst" "connect" "hadoop-cloud" "kubernetes" "mesos" "streaming" "streaming-kafka-0-10" "yarn")
-TASK_TYPES=("hive-thriftserver-1" "hive-thriftserver-2" "hive-thriftserver-3" "hive-thriftserver-4" "hive-thriftserver-5" "sql-a-1" "sql-a-2" "sql-a-3" "sql-a-4" "sql-a-5" "sql-a-6" "sql-a-7" "sql-b-1" "sql-b-2" "sql-c-1" "sql-c-2" "sql-c-3" "sql-c-4" "sql-c-5")
-# TASK_TYPES=("sql-kafka-0-10" "sql-a-1" "sql-a-2")
+# TASK_TYPES=("hive-thriftserver-1" "hive-thriftserver-2" "hive-thriftserver-3" "hive-thriftserver-4" "hive-thriftserver-5" "sql-a-1" "sql-a-2" "sql-a-3" "sql-a-4" "sql-a-5" "sql-a-6" "sql-a-7" "sql-b-1" "sql-b-2" "sql-c-1" "sql-c-2" "sql-c-3" "sql-c-4" "sql-c-5")
+TASK_TYPES=("sql-kafka-0-10")
 echo "=====================================================
 准备启动 31 个 Spark 任务...
 ====================================================="
@@ -43,7 +43,7 @@ for TASK_TYPE in "${TASK_TYPES[@]}"; do
         --security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \\
         --subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \\
         --ami 704106a0-5ab8-491c-8403-73041fca5f54 \\
-        --num-instances 1 --timeout-hours 3 --instance-type kc1.xlarge.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1 --task-type $TASK_TYPE --actor zizdlp --use-ip"
+        --num-instances 1 --timeout-hours 7 --instance-type kc1.xlarge.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1 --task-type $TASK_TYPE --actor zizdlp --use-ip"
     
     FULL_COMMAND="cd ~/schedule && $PYTHON_CMD"
     tmux send-keys -t $SESSION_NAME "$FULL_COMMAND" C-m
