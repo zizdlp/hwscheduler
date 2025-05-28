@@ -1,12 +1,10 @@
 # coding: utf-8
-import sys
-sys.path.append("/mnt/schedule")  # Add the project root to the path
-from hw.createEIP import create_eip
-from hw.saveInfo import save_info,cleanHostsBeforeInsert
-from hw.createInstance import parallel_create_instances
-from hw.saveInfo import printFile
+from scheduler.huawei.eip_manager import create_eip
+from scheduler.huawei.saveInfo import save_info,cleanHostsBeforeInsert
+from scheduler.huawei.ecs_manager import parallel_create_instances
+from scheduler.huawei.saveInfo import printFile
 import argparse
-from hw.config_pwdless import configure_pwdless
+from scheduler.huawei.config_pwdless import configure_pwdless
 from huaweicloudsdkecs.v2 import *
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='DEMO')
