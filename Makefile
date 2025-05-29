@@ -141,3 +141,5 @@ task_spark_UT:
 		--num-instances 1 --instance-type kc1.xlarge.4 --key-pair ${HW_SDK_KEYPEM} --run-number 1 --task-type yarn --actor zizdlp --use-ip
 kill_all:
 	tmux kill-server
+parse:
+	python parse_xml.py ./cache/root
