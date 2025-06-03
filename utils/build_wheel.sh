@@ -10,7 +10,7 @@ cd /io/chukonu/build && make -j && make install
 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/io/chukonu/install/lib:/opt/rh/rh-python38/root/usr/lib64
 cd /io/chukonu/python && /opt/python/cp38-cp38/bin/python setup.py sdist
 cd /io/chukonu/python && /opt/python/cp38-cp38/bin/python setup.py bdist_wheel
-cd /io/chukonu/python && auditwheel repair dist/chukonu-0.2.0.dev0-py3-none-any.whl \
+cd /io/chukonu/python && auditwheel repair dist/chukonu-1.1.0-py3-none-any.whl \
     --exclude libjsig.so \
     --exclude libjvm.so \
     --plat manylinux2014_aarch64 -w ./wheelhouse

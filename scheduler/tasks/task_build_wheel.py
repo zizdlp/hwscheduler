@@ -75,7 +75,7 @@ def step_build_wheel(node, initial_key_path, user, task_name):
         ctest_log = f"{test_logs_dir}/{task_name}.log"
         print(f"Running C++ tests on {node} and saving logs to {ctest_log}")
         conn.run(f"touch {ctest_log}")
-        
+        # conn.run(f"cp /root/chukonu/python/dist/chukonu-1.1.0-py3-none-any.whl")
         success = True
         
     except Exception as e:
@@ -288,27 +288,27 @@ def main():
             time.sleep(1)
         print("\r" + " " * 30 + "\r", end="") 
 
-        # # 先删除实例
-        # all_deleted_successfully = manager.delete_instances(server_ids_to_delete)
+        # 先删除实例
+        all_deleted_successfully = manager.delete_instances(server_ids_to_delete)
         
-        # # 然后删除EIP
-        # if eip_ids_to_delete:
-        #     console.print("[cyan]开始清理关联的EIP...[/cyan]")
-        #     manager.eip_manager.delete_eips(eip_ids_to_delete)
+        # 然后删除EIP
+        if eip_ids_to_delete:
+            console.print("[cyan]开始清理关联的EIP...[/cyan]")
+            manager.eip_manager.delete_eips(eip_ids_to_delete)
             
-        #     # 清理文件
-        #     info_path = f"./cache/{args.run_number}_{args.task_type}_ip_info.txt"
-        #     if os.path.exists(info_path):
-        #         os.remove(info_path)
-        #         console.print(f"[dim]已清理文件: {info_path}[/dim]")
+            # 清理文件
+            info_path = f"./cache/{args.run_number}_{args.task_type}_ip_info.txt"
+            if os.path.exists(info_path):
+                os.remove(info_path)
+                console.print(f"[dim]已清理文件: {info_path}[/dim]")
 
-        # if all_deleted_successfully:
-        #     if len(server_ids_to_delete) == args.num_instances :
-        #          console.print(f"[bold green]✓ 测试完成: {len(server_ids_to_delete)} 个实例全部创建并成功删除![/bold green]")
-        #     else:
-        #          console.print(f"[bold green]✓ 测试部分完成: {len(server_ids_to_delete)}/{args.num_instances} 个实例创建并成功删除! (其余实例创建失败)[/bold green]")
-        # else:
-        #     console.print(f"[bold red]✗ 测试失败: 部分或全部实例 (共 {len(server_ids_to_delete)} 个尝试删除) 删除失败.[/bold red]")
+        if all_deleted_successfully:
+            if len(server_ids_to_delete) == args.num_instances :
+                 console.print(f"[bold green]✓ 测试完成: {len(server_ids_to_delete)} 个实例全部创建并成功删除![/bold green]")
+            else:
+                 console.print(f"[bold green]✓ 测试部分完成: {len(server_ids_to_delete)}/{args.num_instances} 个实例创建并成功删除! (其余实例创建失败)[/bold green]")
+        else:
+            console.print(f"[bold red]✗ 测试失败: 部分或全部实例 (共 {len(server_ids_to_delete)} 个尝试删除) 删除失败.[/bold red]")
     else:
         console.print("[red]⚠ 没有实例创建成功，因此不执行删除操作.[/red]")
 
