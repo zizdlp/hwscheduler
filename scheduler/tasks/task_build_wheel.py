@@ -57,7 +57,7 @@ def step_build_wheel(node, initial_key_path, user, task_name):
         commands = [
             # 启动容器并执行构建命令
             ("docker start manylinux && docker exec manylinux /bin/bash -c 'bash /io/build_wheel.sh'",
-            'build.log'),
+            'build_wheel.log'),
         ]
         
         for cmd, logfile in commands:
@@ -71,11 +71,8 @@ def step_build_wheel(node, initial_key_path, user, task_name):
                 success = False
                 continue
         
-        # Run tests
-        ctest_log = f"{test_logs_dir}/{task_name}.log"
-        print(f"Running C++ tests on {node} and saving logs to {ctest_log}")
-        conn.run(f"touch {ctest_log}")
-        # conn.run(f"cp /root/chukonu/python/dist/chukonu-1.1.0-py3-none-any.whl")
+        
+        conn.run(f"cp /root/chukonu/python/wheelhouse/chukonu-1.1.0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl {test_logs_dir}/chukonu-1.1.0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl")
         success = True
         
     except Exception as e:
