@@ -3,5 +3,6 @@
 cache/
 venv/
 dist/
+logs/*
 *.egg-info/
 __pycache__/
