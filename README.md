@@ -7,6 +7,13 @@ apt install -y openssh-client
 apt install -y python3
 apt install -y python3-pip
 pip install huaweicloudsdkcore huaweicloudsdkecs huaweicloudsdkeip fabric
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh
+```
+
+```
+conda create -n py10 python=3.10
+conda activate py10         
+pip install huaweicloudsdkcore huaweicloudsdkecs huaweicloudsdkeip  rich fabric      
 ```
 
 ```
