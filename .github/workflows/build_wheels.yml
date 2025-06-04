@@ -12,11 +12,11 @@ jobs:
       - name: Install build tools
         run: pip install build
       - name: Build wheel
-        run: python -m build --wheel --outdir wheelhouse/
+        run: python -m build --wheel --outdir dist/
       - uses: actions/upload-artifact@v4
         with:
           name: wheels
-          path: ./wheelhouse/*.whl
+          path: ./dist/*.whl
           overwrite: true
 
   upload_pypi:
@@ -24,13 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     steps:
-      - uses: actions/upload-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: wheels
           path: dist
-          overwrite: true
-      - uses: pypa/gh-action-pypi-publish@v1.4.2
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: ${{ secrets.pypi_username }}
           password: ${{ secrets.pypi_password }}
-
