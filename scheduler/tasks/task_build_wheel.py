@@ -60,16 +60,24 @@ def execute_command_with_logging(conn, command: str, log_file: str = None, descr
         cmd_display = command if len(command) < 60 else f"{command[:50]}...[truncated]...{command[-5:]}"
         console.print(f"[dim]Command: [white]{cmd_display}[/white][/dim]")
         
+        # Start timer
+        start_time = time.time()
+        
         # Execute the command
         result = conn.run(command, warn=True, hide=True)
         
+        # Calculate duration
+        duration = time.time() - start_time
+        mins, secs = divmod(duration, 60)
+        time_str = f"{int(mins)}m {secs:.2f}s"
+        
         if result.ok:
-            console.print(f"[green]✓ Success (exit={result.exited})[/green]")
+            console.print(f"[green]✓ Success (exit={result.exited}, time={time_str})[/green]")
             if log_file:
                 console.print(f"[dim]Log saved to: {log_file}[/dim]")
             return True
         else:
-            console.print(f"[red]✗ Failed (exit={result.exited})[/red]")
+            console.print(f"[red]✗ Failed (exit={result.exited}, time={time_str})[/red]")
             
             # Show error details if available
             if result.stderr:
@@ -92,7 +100,6 @@ def execute_command_with_logging(conn, command: str, log_file: str = None, descr
         console.print(f"[red]⚠ Exception during command execution: {str(e)}[/red]")
         console.print_exception()
         return False
-
 def step_build_wheel(node: str, initial_key_path: str, user: str, task_name: str) -> bool:
     """
     Build and install Chukonu on the specified node and collect test results
