@@ -2,8 +2,8 @@ name: Build and Publish Python Package
 
 on:
   push:
-    # tags:
-    #   - "v*"  # Trigger on tags like v1.0.0
+    tags:
+      - "v*"  # Trigger on tags like v1.0.0
 
 jobs:
   build:
