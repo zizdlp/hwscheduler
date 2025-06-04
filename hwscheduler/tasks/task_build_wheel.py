@@ -100,7 +100,7 @@ def execute_command_with_logging(conn, command: str, log_file: str = None, descr
         console.print(f"[red]⚠ Exception during command execution: {str(e)}[/red]")
         console.print_exception()
         return False
-def step_build_wheel(node: str, initial_key_path: str, user: str, task_name: str) -> bool:
+def step_build_wheel(node: str, initial_key_path: str, user: str, task_name: str,script_path) -> bool:
     """
     Build and install Chukonu on the specified node and collect test results
     
@@ -173,7 +173,7 @@ def step_build_wheel(node: str, initial_key_path: str, user: str, task_name: str
             return False
             
         try:
-            conn.put("./utils/build_wheel.sh", "/root/build_wheel.sh")
+            conn.put(script_path, "/root/build_wheel.sh")
             console.print("[green]✓ Build script uploaded successfully[/green]")
             
             # Verify file exists
@@ -519,6 +519,7 @@ def main():
     parser.add_argument('--use-ip', action='store_true', help='Allocate public IP (default: false)', default=False)
     parser.add_argument('--commit-id', default="", help='Chukonu commit ID')
     parser.add_argument('--bandwidth', type=int, default=5, help='EIP bandwidth (Mbps)')
+    parser.add_argument('--script-path', required=True, help='build wheel sh')
     args = parser.parse_args()
 
     # Initialize manager
@@ -561,7 +562,7 @@ def main():
             return
         
         # Build wheel
-        if not step_build_wheel(first_instance['public_ip'], args.key_path, "root", args.task_type):
+        if not step_build_wheel(first_instance['public_ip'], args.key_path, "root", args.task_type,args.script_path):
             console.print("[red]Aborting due to build failure[/red]")
             step_delete_resources(manager, created_instances, args)
             return

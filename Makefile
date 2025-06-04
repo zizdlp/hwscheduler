@@ -144,7 +144,7 @@ kill_all:
 parse:
 	python parse_xml.py ./cache/root
 task_build_wheel:
-	python -m scheduler.tasks.task_build_wheel  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
+	python -m hwscheduler.tasks.task_build_wheel  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
 	--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
 	--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
 	--ami cc6c4e1e-1fa2-44ff-821b-38c3360507e2 \
@@ -153,5 +153,5 @@ alice:
 	python -m hwscheduler.tasks.task_build_wheel  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
 	--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
 	--subnet-id 6a19704d-f0cf-4e10-a5df-4bd947b33ffc \
-	--ami cc6c4e1e-1fa2-44ff-821b-38c3360507e2 \
+	--ami cc6c4e1e-1fa2-44ff-821b-38c3360507e2 --script-path ./utils/build_wheel.sh \
 	--num-instances 1 --instance-type kc1.xlarge.4 --key-pair ${HW_SDK_KEYPEM} --key-path /Users/zz/github/schedule/KeyPair-loacl.pem  --run-number 1 --task-type build_wheel --commit-id 565d270411b15f74f35ac --actor zizdlp --use-ip
