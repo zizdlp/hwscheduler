@@ -21,9 +21,9 @@ from huaweicloudsdkecs.v2 import *
 from huaweicloudsdkeip.v2.region.eip_region import EipRegion
 from huaweicloudsdkeip.v2 import *
 from huaweicloudsdkcore.exceptions import exceptions
-from scheduler.huawei.fabric_login import connect_with_key
-from scheduler.huawei.ecs_manager import ECSInstanceManager,save_eips_to_file
-from scheduler.huawei.test_build_chukonu import test_build_chukonu
+from hwscheduler.huawei.fabric_login import connect_with_key
+from hwscheduler.huawei.ecs_manager import ECSInstanceManager,save_eips_to_file
+from hwscheduler.huawei.test_build_chukonu import test_build_chukonu
 console = Console()
 
 def main():

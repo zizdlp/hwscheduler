@@ -14,7 +14,7 @@ from rich.text import Text
 from rich.syntax import Syntax
 from huaweicloudsdkecs.v2 import *
 from huaweicloudsdkeip.v2 import *
-from scheduler.huawei.ecs_manager import ECSInstanceManager, save_eips_to_file
+from hwscheduler.huawei.ecs_manager import ECSInstanceManager, save_eips_to_file
 
 console = Console()
 

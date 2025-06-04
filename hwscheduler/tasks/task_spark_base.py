@@ -1,12 +1,14 @@
-from scheduler.huawei.saveInfo import save_info,cleanHostsBeforeInsert
-from scheduler.huawei.ecs_manager import parallel_create_instances
-from scheduler.huawei.saveInfo import printFile
+# coding: utf-8
+import sys
+from hwscheduler.huawei.saveInfo import save_info,cleanHostsBeforeInsert
+from hwscheduler.huawei.ecs_manager import parallel_create_instances
+from hwscheduler.huawei.saveInfo import printFile
 import argparse
-from scheduler.huawei.config_pwdless import configure_pwdless,read_cluster_info_file
+from hwscheduler.huawei.config_pwdless import configure_pwdless,read_cluster_info_file
 from huaweicloudsdkecs.v2 import *
-from scheduler.huawei.test_build_chukonu import test_build_chukonu
-from scheduler.huawei.deleteServer import delete_servers
-from scheduler.huawei.delete_eip import delete_eip_bytask
+from hwscheduler.huawei.test_spark_base import test_spark_base
+from hwscheduler.huawei.deleteServer import delete_servers
+from hwscheduler.huawei.delete_eip import delete_eip_bytask
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='DEMO')
     
@@ -35,6 +37,7 @@ if __name__ == "__main__":
     parser.add_argument('--use-spot', type=str, default="true", help='Whether to use spot instances')
     parser.add_argument('--use-ip', type=str, default="true", help='Whether to assign public IP')
     parser.add_argument('--user', default='root', help='The username to connect as (default: root).')
+    parser.add_argument('--task-name',required=True, help='哪个测试')
     args = parser.parse_args()
     
     try:
@@ -69,17 +72,18 @@ if __name__ == "__main__":
         
         nodes = read_cluster_info_file(cluster_info)
         master_node = next((node for node in nodes if node['hostname'].startswith('node0-')), None)
-        print(f"====== test build chukonu on {master_node}")
-        test_build_chukonu(master_node['hostname'],key_path, args.user)
+        print(f"====== test spark base on {master_node}")
+        test_spark_base(master_node['hostname'],key_path, args.user,args.task_name)
     
     except Exception as e:
         print(f"Error occurred: {e}", file=sys.stderr)
         sys.exit(1)
     
     finally:
-        # These steps will execute regardless of whether an error occurred
-        if 'nodes' in locals():  # Check if nodes variable exists
-            server_ids=[ServerId(id=node['server_id']) for node in nodes]
-            delete_servers(server_ids,args.region,args.ak,args.sk)
-        ip_info = "./cache/"+args.task_type+"_ip_info.txt"
-        success = delete_eip_bytask(args.ak, args.sk, args.region,ip_info)
+        pass
+        #These steps will execute regardless of whether an error occurred
+        # if 'nodes' in locals():  # Check if nodes variable exists
+        #     server_ids=[ServerId(id=node['server_id']) for node in nodes]
+        #     delete_servers(server_ids,args.region,args.ak,args.sk)
+        # ip_info = "./cache/"+args.task_type+"_ip_info.txt"
+        # success = delete_eip_bytask(args.ak, args.sk, args.region,ip_info)

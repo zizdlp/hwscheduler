@@ -21,7 +21,7 @@ from huaweicloudsdkecs.v2 import *
 from huaweicloudsdkeip.v2.region.eip_region import EipRegion
 from huaweicloudsdkeip.v2 import *
 from huaweicloudsdkcore.exceptions import exceptions
-from scheduler.huawei.fabric_login import connect_with_key
+from hwscheduler.huawei.fabric_login import connect_with_key
 console = Console()
 
 # 添加新的SSH配置类

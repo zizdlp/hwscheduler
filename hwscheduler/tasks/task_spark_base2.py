@@ -14,7 +14,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeEl
 from rich.table import Table
 from huaweicloudsdkecs.v2 import *
 from huaweicloudsdkeip.v2 import *
-from scheduler.huawei.ecs_manager import ECSInstanceManager,save_eips_to_file
+from hwscheduler.huawei.ecs_manager import ECSInstanceManager,save_eips_to_file
 console = Console()
 
 # 首先定义不同任务对应的命令模板
