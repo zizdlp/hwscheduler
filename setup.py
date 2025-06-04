@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="scheduler",
+    name="hw-scheduler",
     version="0.1",
     packages=find_packages(exclude=["tests*"]),
     install_requires=[ 
