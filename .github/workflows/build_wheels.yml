@@ -29,5 +29,4 @@ jobs:
           name: wheels
           path: dist
       - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          token: ${{ secrets.PYPI_TOKEN }}
+          
