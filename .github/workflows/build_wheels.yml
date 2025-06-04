@@ -30,5 +30,4 @@ jobs:
           path: dist
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          user: ${{ secrets.pypi_username }}
-          password: ${{ secrets.pypi_password }}
+          token: ${{ secrets.PYPI_TOKEN }}
