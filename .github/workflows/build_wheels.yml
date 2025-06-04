@@ -28,7 +28,7 @@ jobs:
         run: |
           ls -la dist/
           pip install dist/*.whl --force-reinstall
-          python -c "import scheduler; print(scheduler.__version__)"
+          python -c "import hwscheduler; print(hwscheduler.__version__)"
           
       - uses: actions/upload-artifact@v4
         with:
