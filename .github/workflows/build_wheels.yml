@@ -1,6 +1,8 @@
 name: Build and Publish
-
-on: [push, pull_request]
+on:
+  push:
+    tags:
+      - "*" # This will trigger on any tag push
 
 jobs:
   build_wheels:
@@ -23,12 +25,12 @@ jobs:
     needs: [build_wheels]
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
-    
+
     # Add these permissions for OIDC
     permissions:
-      id-token: write  # Required for OIDC with PyPI trusted publishing
-      contents: read   # Required for actions/checkout
-    
+      id-token: write # Required for OIDC with PyPI trusted publishing
+      contents: read # Required for actions/checkout
+
     steps:
       - uses: actions/download-artifact@v4
         with:
