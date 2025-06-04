@@ -12,31 +12,21 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
         python: [38, 39, 310, 311]
-        bitness: [32, 64]
+        bitness: [64]
         manylinux_image: [manylinux2014]
         include:
           - os: windows-latest
             bitness: 64
             platform_id: win_amd64
-          - os: windows-latest
-            bitness: 32
-            platform_id: win32
           - os: ubuntu-latest
             bitness: 64
             platform_id: manylinux_x86_64
-          - os: ubuntu-latest
-            bitness: 32
-            platform_id: manylinux_i686
           - os: macos-latest
             bitness: 64
             platform_id: macosx_x86_64
-        exclude:
-          - os: macos-latest
-            bitness: 32
 
     steps:
-      - uses: actions/checkout@v4
-
+      - uses: actions/checkout@v3
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.11.2
         env:
