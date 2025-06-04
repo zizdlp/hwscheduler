@@ -1,58 +1,33 @@
-name: Build
+name: Build and Publish
 
 on: [push, pull_request]
 
 jobs:
   build_wheels:
-    name: Build wheel for cp${{ matrix.python }}-${{ matrix.platform_id }}-${{ matrix.manylinux_image }}
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        python: [39, 310, 311]
-        bitness: [64]
-        manylinux_image: [manylinux2014]
-        include:
-          - os: windows-latest
-            bitness: 64
-            platform_id: win_amd64
-          - os: ubuntu-latest
-            bitness: 64
-            platform_id: manylinux_x86_64
-          - os: macos-latest
-            bitness: 64
-            platform_id: macosx_x86_64
-
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Build wheels
-        uses: pypa/cibuildwheel@v2.11.2
-        env:
-          CIBW_MANYLINUX_I686_IMAGE: ${{ matrix.manylinux_image }}
-          CIBW_BUILD: cp${{ matrix.python }}-${{ matrix.platform_id }}
-          CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_image }}
-
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+      - name: Install build tools
+        run: pip install build
+      - name: Build wheel
+        run: python -m build --wheel --outdir wheelhouse/
+      - uses: actions/upload-artifact@v3
         with:
           name: wheels
           path: ./wheelhouse/*.whl
-          overwrite: true
 
   upload_pypi:
     needs: [build_wheels]
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     steps:
-      - uses: actions/upload-artifact@v4
+      - uses: actions/download-artifact@v3
         with:
           name: wheels
           path: dist
-          overwrite: true
-
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@v1.4.2
         with:
           user: ${{ secrets.pypi_username }}
           password: ${{ secrets.pypi_password }}
