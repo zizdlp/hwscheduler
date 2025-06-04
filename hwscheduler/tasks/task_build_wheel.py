@@ -528,7 +528,6 @@ def main():
     
     # Step 1: Create instances
     created_instances = step_create_instances(manager, args)
-    
     if not created_instances:
         print_error("Test failed: No instances created successfully")
         if args.use_ip and manager.eip_list:
@@ -537,7 +536,6 @@ def main():
         return
 
     print_success(f"Total {len(created_instances)}/{args.num_instances} instances created successfully")
-    
     if len(created_instances) < args.num_instances:
         print_warning(f"Note: {args.num_instances - len(created_instances)} instances failed to create")
 
