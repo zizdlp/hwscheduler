@@ -1,39 +1,54 @@
-name: Build and Publish
+name: Build and Publish Python Package
+
 on:
   push:
     tags:
-      - "*" # This will trigger on any tag push
+      - "v*"  # Trigger on tags like v1.0.0
 
 jobs:
-  build_wheels:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: Set up Python
         uses: actions/setup-python@v4
-      - name: Install build tools
-        run: pip install build
-      - name: Build wheel
-        run: python -m build --wheel --outdir dist/
+        with:
+          python-version: "3.12"
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel
+          
+      - name: Build wheel package
+        run: python -m build --wheel --no-isolation --outdir dist/
+        
+      - name: Verify wheel
+        run: |
+          ls -la dist/
+          pip install dist/*.whl --force-reinstall
+          python -c "import scheduler; print(scheduler.__version__)"
+          
       - uses: actions/upload-artifact@v4
         with:
-          name: wheels
-          path: ./dist/*.whl
-          overwrite: true
+          name: python-package
+          path: dist/*.whl
 
-  upload_pypi:
-    needs: [build_wheels]
+  publish:
+    needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-
-    # Add these permissions for OIDC
     permissions:
-      id-token: write # Required for OIDC with PyPI trusted publishing
-      contents: read # Required for actions/checkout
-
+      id-token: write  # Needed for OIDC auth with PyPI
+      contents: read
+      
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: wheels
+          name: python-package
           path: dist
-      - uses: pypa/gh-action-pypi-publish@release/v1
+          
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
