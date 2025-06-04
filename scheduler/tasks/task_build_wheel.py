@@ -99,7 +99,7 @@ def step_build_wheel(node, initial_key_path, user, task_name):
                 conn.close()
         
         return success
-def step_fetch_repo(node, initial_key_path, user):
+def step_fetch_repo(node, initial_key_path, user,commit_id):
     """
     Build and install Chukonu on the specified node
     """
@@ -120,7 +120,9 @@ def step_fetch_repo(node, initial_key_path, user):
             
             # 创建必要目录
             conn.run("mkdir -p /tmp/staging /tmp/cache /root/chukonu/build /root/chukonu/install")
-            conn.run("cd /root/chukonu && git pull && git checkout v1.1.0")
+            if commit_id:
+                print(f"======================== use commit: {commit_id} ============================")
+                conn.run(f"cd /root/chukonu && git pull && git checkout {commit_id}")
           
             return True
             
@@ -154,6 +156,7 @@ def main():
     parser.add_argument('--timeout-hours', default="1", help='自动终止时间(小时, 默认1小时)')
     parser.add_argument('--actor', required=True, help='操作者')
     parser.add_argument('--use-ip', action='store_true', help='是否分配公网IP (默认为不分配)', default=False)
+    parser.add_argument('--commit-id',default="",help='chukonu commit id')
     parser.add_argument('--bandwidth', type=int, default=5, help='EIP带宽大小(Mbps)')
     args = parser.parse_args()
 
@@ -271,7 +274,7 @@ def main():
                 inst['status']
             )
         console.print(table)
-        step_fetch_repo(created_instances_details[0]['public_ip'],initial_key_path,"root")
+        step_fetch_repo(created_instances_details[0]['public_ip'],initial_key_path,"root",args.commit_id)
         step_build_wheel(created_instances_details[0]['public_ip'],initial_key_path,"root",args.task_type)
         
         server_ids_to_delete = [inst['id'] for inst in created_instances_details]
