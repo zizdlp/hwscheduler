@@ -1,2 +1,3 @@
 __version__ = "0.2"
-__all__ = [...]  # 你的导出列表
+from .tasks import task_build_wheel
+__all__ = ['task_build_wheel']  # 或者列出要导出的具体模块/函数名
