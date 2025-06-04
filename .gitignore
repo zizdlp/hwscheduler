@@ -8,3 +8,4 @@ logs/*
 *.egg-info/
 __pycache__/
 Miniconda*
+.DS_Store
