@@ -1,3 +1,3 @@
 __version__ = "0.4"
-from .tasks import task_build_wheel
-__all__ = ['task_build_wheel']  # 或者列出要导出的具体模块/函数名
+from .tasks import task_build_wheel,task_build_chukonu
+__all__ = ['task_build_wheel','task_build_chukonu']  # 或者列出要导出的具体模块/函数名

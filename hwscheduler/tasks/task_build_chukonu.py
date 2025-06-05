@@ -1,85 +1,564 @@
-from hwscheduler.huawei.saveInfo import save_info,cleanHostsBeforeInsert
-from hwscheduler.huawei.ecs_manager import parallel_create_instances
-from hwscheduler.huawei.saveInfo import printFile
+# coding: utf-8
+from fabric import Connection
+from concurrent.futures import ThreadPoolExecutor
+import os
 import argparse
-from hwscheduler.huawei.config_pwdless import configure_pwdless,read_cluster_info_file
+import time
+from concurrent.futures import as_completed
+from datetime import datetime
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.table import Table
+from rich.panel import Panel
 from huaweicloudsdkecs.v2 import *
-from hwscheduler.huawei.test_build_chukonu import test_build_chukonu
-from hwscheduler.huawei.deleteServer import delete_servers
-from hwscheduler.huawei.delete_eip import delete_eip_bytask
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='DEMO')
+from huaweicloudsdkeip.v2 import *
+from hwscheduler.huawei.ecs_manager import ECSInstanceManager, save_eips_to_file
+
+console = Console()
+
+def print_step_header(title: str, style: str = "bold blue"):
+    """打印步骤标题"""
+    console.rule(f"[{style}]{title}[/{style}]")
+
+def print_success(message: str):
+    """打印成功信息"""
+    console.print(f"[bold green]✓ {message}[/bold green]")
+
+def print_warning(message: str):
+    """打印警告信息"""
+    console.print(f"[bold yellow]⚠ {message}[/bold yellow]")
+
+def print_error(message: str):
+    """打印错误信息"""
+    console.print(f"[bold red]✗ {message}[/bold red]")
+
+def print_info(message: str):
+    """打印信息"""
+    console.print(f"[cyan]ℹ {message}[/cyan]")
+
+def execute_command_with_logging(conn, command: str, log_file: str = None, description: str = None) -> bool:
+    """
+    Execute a command with rich logging and status reporting
     
-    # Required credentials
-    parser.add_argument('--ak', required=True, help='Huawei Cloud Access Key')
-    parser.add_argument('--sk', required=True, help='Huawei Cloud Secret Key')
-    parser.add_argument('--vpc-id', required=True, help='VPC ID for the instances')
+    Args:
+        conn: Fabric Connection object
+        command: Command to execute
+        log_file: Path to log file (optional)
+        description: Human-readable description of the command
+        
+    Returns:
+        bool: True if command succeeded, False otherwise
+    """
+    try:
+        # Print command header
+        if description:
+            console.print(f"\n[bold]Executing: [cyan]{description}[/cyan][/bold]")
+        
+        # Display the command (truncate if too long)
+        cmd_display = command if len(command) < 60 else f"{command[:50]}...[truncated]...{command[-5:]}"
+        console.print(f"[dim]Command: [white]{cmd_display}[/white][/dim]")
+        
+        # Start timer
+        start_time = time.time()
+        
+        # Execute the command
+        result = conn.run(command, warn=True, hide=True)
+        
+        # Calculate duration
+        duration = time.time() - start_time
+        mins, secs = divmod(duration, 60)
+        time_str = f"{int(mins)}m {secs:.2f}s"
+        
+        if result.ok:
+            console.print(f"[green]✓ Success (exit={result.exited}, time={time_str})[/green]")
+            if log_file:
+                console.print(f"[dim]Log saved to: {log_file}[/dim]")
+            return True
+        else:
+            console.print(f"[red]✗ Failed (exit={result.exited}, time={time_str})[/red]")
+            
+            # Show error details if available
+            if result.stderr:
+                console.print(Panel(result.stderr, 
+                                 title="[red]Error Output[/red]",
+                                 border_style="red"))
+            
+            # Show log tail if available
+            if log_file:
+                tail_cmd = f"tail -n 20 {log_file}"
+                tail_result = conn.run(tail_cmd, warn=True, hide=True)
+                if tail_result.ok:
+                    console.print(Panel(tail_result.stdout, 
+                                     title=f"[red]Last 20 lines of {log_file}[/red]",
+                                     border_style="red",
+                                     subtitle=f"Full log at: {log_file}"))
+            return False
+            
+    except Exception as e:
+        console.print(f"[red]⚠ Exception during command execution: {str(e)}[/red]")
+        console.print_exception()
+        return False
+
+def step_build_chukonu(node: str, initial_key_path: str, user: str, task_type: str) -> bool:
+    """
+    Build and install Chukonu on the specified node with rich logging
     
-    # Instance configuration
-    parser.add_argument('--num-instances', type=int, default=4, help='Number of instances to create')
-    parser.add_argument('--region', type=str, default="ap-southeast-3", help='Region for the instances')
-    parser.add_argument('--instance-type', type=str, default="kc1.large.4", help='Instance type')
-    parser.add_argument('--instance-zone', type=str, default="ap-southeast-3a", help='Availability zone')
-    parser.add_argument('--ami', type=str, default="04b5ea14-da35-47de-8467-66808dd62007", help='AMI ID')
-    parser.add_argument('--key-pair', type=str, required=True, help='SSH key pair name')
-    parser.add_argument('--security-group-id', type=str, 
-                       default="6308b01a-0e7a-413a-96e2-07a3e507c324", help='Security group ID')
-    parser.add_argument('--subnet-id', type=str, 
-                       default="6a19704d-f0cf-4e10-a5df-4bd947b33ffc", help='Subnet ID')
-    # Optional parameters
-    parser.add_argument('--use-nvme', type=bool, default=True, help='Whether to use NVMe')
-    parser.add_argument('--run-number', type=str, default="0", help='Run number identifier')
-    parser.add_argument('--task-type', type=str, default="spark", help='Task type identifier')
-    parser.add_argument('--timeout-hours', type=str, default="6", help='Timeout in hours')
-    parser.add_argument('--actor', type=str, help='User who triggered the creation')
-    parser.add_argument('--use-spot', type=str, default="true", help='Whether to use spot instances')
-    parser.add_argument('--use-ip', type=str, default="true", help='Whether to assign public IP')
-    parser.add_argument('--user', default='root', help='The username to connect as (default: root).')
-    args = parser.parse_args()
+    Args:
+        node: IP address or hostname of the node
+        initial_key_path: Path to SSH key
+        user: SSH username
+        task_type: Task type identifier for logging
+        
+    Returns:
+        bool: True if build succeeded, False otherwise
+    """
+    print_step_header(f"Building Chukonu on {node}")
     
     try:
-        instances = parallel_create_instances(
-            ak=args.ak,
-            sk=args.sk,
-            vpc_id=args.vpc_id,
-            num_instances=args.num_instances,
-            region=args.region,
-            instance_type=args.instance_type,
-            instance_zone=args.instance_zone,
-            ami=args.ami,
-            key_pair=args.key_pair,
-            security_group_id=args.security_group_id,
-            subnet_id=args.subnet_id,
-            use_nvme=args.use_nvme,
-            run_number=args.run_number,
-            task_type=args.task_type,
-            timeout_hours=args.timeout_hours,
-            actor=args.actor,
-            use_spot=args.use_spot,
-            use_ip=args.use_ip
+        with Connection(
+            host=node,
+            user=user,
+            connect_kwargs={"key_filename": initial_key_path},
+        ) as conn:
+            # Print connection info
+            console.print(f"\n[bold]Connected to [cyan]{node}[/cyan] as [cyan]{user}[/cyan][/bold]")
+            
+            # Set environment variables
+            console.print("\n[bold]Setting environment variables...[/bold]")
+            conn.config.run.env = {
+                'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-arm64',
+                'CHUKONU_HOME': '/root/chukonu/install',
+                'LD_LIBRARY_PATH': '/root/chukonu/install/lib:/tmp/cache',
+                'CHUKONU_TEMP': '/tmp',
+                'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+            }
+            print_success("Environment variables set")
+            
+            # Create necessary directories
+            console.print("\n[bold]Creating directories...[/bold]")
+            dir_commands = [
+                ("mkdir -p /tmp/staging /tmp/cache /root/chukonu/build /root/chukonu/install",
+                 "Create base directories")
+            ]
+            
+            for cmd, desc in dir_commands:
+                if not execute_command_with_logging(conn, cmd, description=desc):
+                    return False
+            
+            # Create test logs directory with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            test_logs_dir = f"/tmp/chukonu_test_logs_{timestamp}"
+            if not execute_command_with_logging(conn, f"mkdir -p {test_logs_dir}", 
+                                             description=f"Create test logs directory: {test_logs_dir}"):
+                return False
+            
+            # Build commands with descriptions
+            build_commands = [
+                # Build Scala components
+                ('cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt package',
+                 "Build Scala package"),
+                
+                ('cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt assembly',
+                 "Create Scala assembly JAR"),
+                
+                # Configure CMake
+                ('cd /root/chukonu/build && cmake .. -DCMAKE_BUILD_TYPE=Debug -DWITH_ASAN=OFF -DWITH_JEMALLOC=OFF -DCMAKE_INSTALL_PREFIX="$CHUKONU_HOME"',
+                 "Configure CMake build"),
+                
+                # Build and install
+                ('cd /root/chukonu/build && make install -j4',
+                 "Build and install Chukonu"),
+            ]
+            
+            # Execute build commands
+            console.print("\n[bold]Starting Chukonu build process...[/bold]")
+            for cmd, desc in build_commands:
+                if not execute_command_with_logging(conn, cmd, description=desc):
+                    print_error(f"Build failed during: {desc}")
+                    return False
+            
+            # Run C++ tests
+            console.print("\n[bold]Running C++ tests...[/bold]")
+            ctest_log = f"{test_logs_dir}/ctest.log"
+            ctest_cmd = f'cd /root/chukonu/build && ctest --output-on-failure > {ctest_log} 2>&1'
+            
+            if not execute_command_with_logging(conn, ctest_cmd, 
+                                             log_file=ctest_log,
+                                             description="Run C++ tests"):
+                print_warning("Some C++ tests failed - check logs for details")
+            
+            # Run Scala tests
+            console.print("\n[bold]Running Scala tests...[/bold]")
+            sbt_log = f"{test_logs_dir}/sbt_test.log"
+            sbt_cmd = f'cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt test > {sbt_log} 2>&1'
+            
+            if not execute_command_with_logging(conn, sbt_cmd,
+                                             log_file=sbt_log,
+                                             description="Run Scala tests"):
+                print_warning("Some Scala tests failed - check logs for details")
+            
+            # Compress test logs
+            console.print("\n[bold]Archiving test logs...[/bold]")
+            archive_cmd = f"tar -czf {test_logs_dir}.tar.gz -C {test_logs_dir} ."
+            if not execute_command_with_logging(conn, archive_cmd,
+                                             description="Archive test logs"):
+                print_warning("Failed to archive test logs - continuing anyway")
+            
+            # Show log locations
+            console.print("\n[bold]Test log locations:[/bold]")
+            console.print(f"[cyan]• C++ tests:[/cyan] {ctest_log}")
+            console.print(f"[cyan]• Scala tests:[/cyan] {sbt_log}")
+            console.print(f"[cyan]• Archived logs:[/cyan] {test_logs_dir}.tar.gz")
+            
+            print_success(f"Chukonu build completed on {node}")
+            return True
+            
+    except Exception as e:
+        console.print_exception()
+        return False
+    finally:
+        try:
+            if conn is not None and conn.is_connected:
+                if test_logs_dir:
+                    console.print("\n[bold]downloading logs...[/bold]")
+                    
+                    # Compress logs
+                    compress_cmd = f"tar -czf {test_logs_dir}.tar.gz -C {test_logs_dir} ."
+                    if not execute_command_with_logging(conn, compress_cmd,
+                                                      description="Compress logs"):
+                        return False
+                    
+                    # Download logs
+                    local_cache_dir = "./logs"
+                    os.makedirs(local_cache_dir, exist_ok=True)
+                    local_log_path = os.path.join(local_cache_dir, 
+                                                f"chukonu_logs_build_chukounu_{timestamp}.tar.gz")
+                    
+                    try:
+                        console.print(f"Downloading logs to {local_log_path}...")
+                        conn.get(f"{test_logs_dir}.tar.gz", local_log_path)
+                        console.print(f"[green]✓ Logs downloaded to: {local_log_path}[/green]")
+                        
+                        # Verify local file
+                        if os.path.exists(local_log_path):
+                            file_size = os.path.getsize(local_log_path) / (1024 * 1024)  # MB
+                            console.print(f"[dim]Log file size: {file_size:.2f} MB[/dim]")
+                        else:
+                            console.print("[yellow]⚠ Warning: Local log file not found after download[/yellow]")
+                    except Exception as e:
+                        console.print(f"[red]✗ Failed to download logs: {e}[/red]")
+        finally:
+            if conn is not None:
+                conn.close()
+                console.print("[dim]SSH connection closed[/dim]")
+
+def step_fetch_repo(node: str, initial_key_path: str, user: str, commit_id: str) -> bool:
+    """Fetch and checkout the specified commit on the remote node"""
+    print_step_header(f"Fetching repository on {node}")
+    
+    try:
+        with Connection(
+            host=node,
+            user=user,
+            connect_kwargs={"key_filename": initial_key_path},
+        ) as conn:
+            # Print connection info
+            console.print(f"\n[bold]Connected to [cyan]{node}[/cyan] as [cyan]{user}[/cyan][/bold]")
+            
+            # Set environment variables
+            console.print("\n[bold]Setting environment variables...[/bold]")
+            conn.config.run.env = {
+                'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-arm64',
+                'CHUKONU_HOME': '/root/chukonu/install',
+                'LD_LIBRARY_PATH': '/root/chukonu/install/lib:/tmp/cache',
+                'CHUKONU_TEMP': '/tmp',
+                'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+            }
+            console.print("[green]✓ Environment variables set[/green]")
+            
+            # Create necessary directories
+            console.print("\n[bold]Creating directories...[/bold]")
+            dir_commands = [
+                ("mkdir -p /tmp/staging /tmp/cache /root/chukonu/build /root/chukonu/install",
+                 "Create base directories")
+            ]
+            
+            for cmd, desc in dir_commands:
+                if not execute_command_with_logging(conn, cmd, description=desc):
+                    return False
+            
+            if commit_id:
+                console.print(f"\n[bold]Checking out commit: [cyan]{commit_id}[/cyan][/bold]")
+                git_commands = [
+                    ("cd /root/chukonu && git fetch origin",
+                     "Fetch latest changes"),
+                    (f"cd /root/chukonu && git checkout {commit_id}",
+                     f"Checkout commit {commit_id}"),
+                    ("cd /root/chukonu && git status",
+                     "Verify repository status")
+                ]
+                
+                for cmd, desc in git_commands:
+                    if not execute_command_with_logging(conn, cmd, description=desc):
+                        return False
+            
+            print_success(f"Repository updated on {node}")
+            return True
+            
+    except Exception as e:
+        console.print_exception()
+        return False
+
+def step_create_instances(manager: ECSInstanceManager, args) -> list:
+    """Create ECS instances with progress tracking"""
+    print_step_header(f"Creating {args.num_instances} instances")
+    
+    instance_zone = args.instance_zone if args.instance_zone else f"{args.region}a"
+    created_instances_details = []
+    
+    if args.use_ip:
+        console.print("\n[bold]Allocating EIPs...[/bold]")
+        manager.eip_list = manager.eip_manager.create_eips(
+            args.num_instances, 
+            f"{args.run_number}_{args.task_type}",
+            args.bandwidth
         )
         
-        print("Created instances:", instances)
-        cleanHostsBeforeInsert(args.task_type)
-        save_info(instances,args.task_type,True)
-        printFile("/etc/hosts")
-        key_path = args.key_pair+".pem"
-        cluster_info= "./cache/"+args.task_type+"_nodes_info.txt"
-        configure_pwdless(cluster_info,key_path,args.user)
+        if not manager.eip_list or len(manager.eip_list) < args.num_instances:
+            print_error("EIP allocation failed or insufficient EIPs, cannot proceed")
+            return []
         
-        nodes = read_cluster_info_file(cluster_info)
-        master_node = next((node for node in nodes if node['hostname'].startswith('node0-')), None)
-        print(f"====== test build chukonu on {master_node}")
-        test_build_chukonu(master_node['hostname'],key_path, args.user)
+        save_eips_to_file(f"{args.run_number}_{args.task_type}", manager.eip_list)
+        
+        # Display EIP information
+        eip_table = Table(title="Allocated EIPs", show_header=True, header_style="bold cyan")
+        eip_table.add_column("Index", style="dim", justify="right")
+        eip_table.add_column("EIP ID")
+        eip_table.add_column("IP Address")
+        eip_table.add_column("Bandwidth (Mbps)")
+        for i, eip in enumerate(manager.eip_list, 1):
+            eip_table.add_row(str(i), eip['id'], eip['ip'], str(args.bandwidth))
+        console.print(Panel(eip_table))
     
-    except Exception as e:
-        print(f"Error occurred: {e}", file=sys.stderr)
-        sys.exit(1)
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        with ThreadPoolExecutor(max_workers=min(args.num_instances, 10)) as executor:
+            futures = {}
+            for i in range(args.num_instances):
+                task_id = progress.add_task(f"Instance {i+1}/{args.num_instances}", total=100, start=False)
+                progress.update(task_id, completed=0)
+
+                eip_id = manager.eip_list[i]['id'] if args.use_ip and i < len(manager.eip_list) else None
+                
+                future = executor.submit(
+                    manager.create_instance,
+                    progress, task_id, 
+                    vpc_id=args.vpc_id,
+                    instance_index=i,
+                    instance_type=args.instance_type,
+                    instance_zone=instance_zone,
+                    ami=args.ami,
+                    key_pair=args.key_pair,
+                    security_group_id=args.security_group_id,
+                    subnet_id=args.subnet_id,
+                    run_number=args.run_number,
+                    task_type=args.task_type,
+                    timeout_hours=args.timeout_hours,
+                    actor=args.actor,
+                    eip_id=eip_id
+                )
+                futures[future] = (i, task_id) 
+
+            for future in as_completed(futures):
+                instance_index, task_id = futures[future]
+                try:
+                    instance_detail = future.result()
+                    if instance_detail:
+                        created_instances_details.append(instance_detail)
+                        progress.update(task_id, description=f"[green]Instance {instance_index} created", completed=100)
+                    else:
+                        progress.update(task_id, description=f"[red]Instance {instance_index} failed", completed=100)
+                except Exception as e:
+                    progress.update(task_id, description=f"[red]Instance {instance_index} error", completed=100)
+                    console.print(f"[red]Error creating instance {instance_index}: {str(e)}[/red]")
+
+    return created_instances_details
+
+def step_delete_resources(manager: ECSInstanceManager, instances: list, args):
+    """Delete created resources (instances and EIPs)"""
+    print_step_header("Cleaning up resources", style="bold red")
     
-    finally:
-        # These steps will execute regardless of whether an error occurred
-        if 'nodes' in locals():  # Check if nodes variable exists
-            server_ids=[ServerId(id=node['server_id']) for node in nodes]
-            delete_servers(server_ids,args.region,args.ak,args.sk)
-        ip_info = "./cache/"+args.task_type+"_ip_info.txt"
-        success = delete_eip_bytask(args.ak, args.sk, args.region,ip_info)
+    if not instances:
+        print_warning("No instances to delete")
+        return False
+    
+    server_ids_to_delete = [inst['id'] for inst in instances]
+    eip_ids_to_delete = [inst['eip_id'] for inst in instances if inst.get('eip_id')]
+    
+    # Display summary of resources to delete
+    summary_table = Table(title="Resources to Delete", show_header=True, header_style="bold yellow")
+    summary_table.add_column("Resource Type")
+    summary_table.add_column("Count")
+    summary_table.add_row("Instances", str(len(server_ids_to_delete)))
+    summary_table.add_row("EIPs", str(len(eip_ids_to_delete)))
+    console.print(Panel(summary_table))
+    
+    wait_seconds = 10
+    console.print(f"\n[bold yellow]Waiting {wait_seconds} seconds before deletion...[/bold yellow]")
+    
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TimeElapsedColumn(),
+        transient=True
+    ) as progress:
+        task = progress.add_task("[yellow]Waiting to delete...", total=wait_seconds)
+        for _ in range(wait_seconds):
+            time.sleep(1)
+            progress.update(task, advance=1)
+    
+    # Delete instances
+    console.print("\n[bold]Deleting instances...[/bold]")
+    all_deleted = manager.delete_instances(server_ids_to_delete)
+    
+    if all_deleted:
+        console.print(f"[green]✓ Successfully deleted {len(server_ids_to_delete)} instances[/green]")
+    else:
+        console.print(f"[red]✗ Failed to delete some or all instances[/red]")
+    
+    # Delete EIPs
+    if eip_ids_to_delete:
+        console.print("\n[bold]Deleting associated EIPs...[/bold]")
+        deleted_count = manager.eip_manager.delete_eips(eip_ids_to_delete)
+        console.print(f"[green]✓ Deleted {deleted_count}/{len(eip_ids_to_delete)} EIPs[/green]")
+        
+        # Clean up files
+        info_path = f"./cache/{args.run_number}_{args.task_type}_ip_info.txt"
+        if os.path.exists(info_path):
+            try:
+                os.remove(info_path)
+                console.print(f"[green]✓ Removed file: {info_path}[/green]")
+            except Exception as e:
+                console.print(f"[yellow]⚠ Failed to remove file {info_path}: {e}[/yellow]")
+    
+    return all_deleted
+
+def display_instance_table(instances: list):
+    """Display a table of created instances"""
+    if not instances:
+        print_warning("No instances to display")
+        return
+    
+    table = Table(title="Created Instances", show_header=True, header_style="bold green")
+    table.add_column("Index", style="dim", justify="right")
+    table.add_column("Name")
+    table.add_column("ID", style="dim")
+    table.add_column("Private IP")
+    table.add_column("Public IP")
+    table.add_column("Status")
+    table.add_column("Created At")
+    
+    for inst in sorted(instances, key=lambda x: x['index']):
+        table.add_row(
+            str(inst['index']),
+            inst['name'],
+            inst['id'],
+            inst.get('private_ip', 'N/A'),
+            inst.get('public_ip', 'N/A'),
+            inst['status'],
+            inst.get('created_at', 'N/A')
+        )
+    
+    console.print(Panel(table))
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Huawei Cloud ECS Instance Management Tool',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+       )
+    parser.add_argument('--ak', required=True, help='Huawei Cloud Access Key')
+    parser.add_argument('--sk', required=True, help='Huawei Cloud Secret Key')
+    parser.add_argument('--region', required=True, help='Region (e.g. cn-north-4)')
+    parser.add_argument('--vpc-id', required=True, help='VPC ID')
+    parser.add_argument('--num-instances', type=int, default=1, help='Number of instances to create')
+    parser.add_argument('--instance-type', required=True, help='Instance type (e.g. s6.large.2)')
+    parser.add_argument('--instance-zone', help='Availability zone (e.g. cn-north-4a, default: <region>a)', default=None)
+    parser.add_argument('--ami', help='Image ID (e.g. CentOS 7.x)', default="04b5ea14-da35-47de-8467-66808dd62007")
+    parser.add_argument('--key-pair', required=True, help='SSH key pair name')
+    parser.add_argument('--key-path', required=True, help='SSH key pair path')
+    parser.add_argument('--security-group-id', required=True, help='Security group ID')
+    parser.add_argument('--subnet-id', required=True, help='Subnet ID')
+    parser.add_argument('--run-number', required=True, help='Run number')
+    parser.add_argument('--task-type', required=True, help='Task type')
+    parser.add_argument('--timeout-hours', default="1", help='Auto-termination time (hours, default 1)')
+    parser.add_argument('--actor', required=True, help='Operator')
+    parser.add_argument('--use-ip', action='store_true', help='Allocate public IP (default: false)', default=False)
+    parser.add_argument('--commit-id', default="", help='Chukonu commit ID')
+    parser.add_argument('--bandwidth', type=int, default=5, help='EIP bandwidth (Mbps)')
+    args = parser.parse_args()
+
+    # Initialize manager
+    console.print("\n[bold]Initializing ECS Instance Manager...[/bold]")
+    manager = ECSInstanceManager(args.ak, args.sk, args.region)
+    console.print(f"[green]✓ Manager initialized for region {args.region}[/green]")
+    
+    # Step 1: Create instances
+    created_instances = step_create_instances(manager, args)
+    if not created_instances:
+        print_error("Test failed: No instances created successfully")
+        if args.use_ip and manager.eip_list:
+            console.print("\n[bold yellow]Cleaning up allocated EIPs...[/bold yellow]")
+            manager.eip_manager.delete_eips([eip['id'] for eip in manager.eip_list])
+        return
+
+    print_success(f"Total {len(created_instances)}/{args.num_instances} instances created successfully")
+    if len(created_instances) < args.num_instances:
+        print_warning(f"Note: {args.num_instances - len(created_instances)} instances failed to create")
+
+    # Save instance information
+    info_file = manager.save_instances_info(
+        f"{args.run_number}_{args.task_type}",
+        created_instances
+    )
+    console.print(f"[green]✓ Instance information saved to {info_file}[/green]")
+    
+    # Display instance table
+    display_instance_table(created_instances)
+    
+    # Step 2: Fetch repository and build wheel on first instance
+    if created_instances and created_instances[0].get('public_ip'):
+        first_instance = created_instances[0]
+        console.print(f"\n[bold]Using first instance: {first_instance['public_ip']}[/bold]")
+        
+        # Fetch repository
+        if not step_fetch_repo(first_instance['public_ip'], args.key_path, "root", args.commit_id):
+            console.print("[red]Aborting due to repository fetch failure[/red]")
+            step_delete_resources(manager, created_instances, args)
+            return
+        
+        # Build wheel
+        if not step_build_chukonu(first_instance['public_ip'], args.key_path, "root", args.task_type):
+            console.print("[red]Aborting due to build failure[/red]")
+            step_delete_resources(manager, created_instances, args)
+            return
+    
+    # Step 3: Clean up resources
+    all_deleted = step_delete_resources(manager, created_instances, args)
+    
+    if all_deleted:
+        if len(created_instances) == args.num_instances:
+            print_success(f"Test completed: {len(created_instances)} instances created and deleted successfully!")
+        else:
+            print_success(f"Test partially completed: {len(created_instances)}/{args.num_instances} instances created and deleted successfully!")
+    else:
+        print_error(f"Test failed: Some or all instances (total {len(created_instances)} attempted) failed to delete")
+
+if __name__ == "__main__":
+    main()
