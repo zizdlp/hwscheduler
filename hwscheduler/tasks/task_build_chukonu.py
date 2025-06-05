@@ -114,100 +114,104 @@ def step_build_chukonu(node: str, initial_key_path: str, user: str, task_type: s
     """
     print_step_header(f"Building Chukonu on {node}")
     
+    conn = None  # Initialize conn outside try block
+    test_logs_dir = None  # Initialize test_logs_dir outside try block
+    
     try:
-        with Connection(
+        conn = Connection(
             host=node,
             user=user,
             connect_kwargs={"key_filename": initial_key_path},
-        ) as conn:
-            # Print connection info
-            console.print(f"\n[bold]Connected to [cyan]{node}[/cyan] as [cyan]{user}[/cyan][/bold]")
-            
-            # Set environment variables
-            console.print("\n[bold]Setting environment variables...[/bold]")
-            conn.config.run.env = {
-                'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-arm64',
-                'CHUKONU_HOME': '/root/chukonu/install',
-                'LD_LIBRARY_PATH': '/root/chukonu/install/lib:/tmp/cache',
-                'CHUKONU_TEMP': '/tmp',
-                'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-            }
-            print_success("Environment variables set")
-            
-            # Create necessary directories
-            console.print("\n[bold]Creating directories...[/bold]")
-            dir_commands = [
-                ("mkdir -p /tmp/staging /tmp/cache /root/chukonu/build /root/chukonu/install",
-                 "Create base directories")
-            ]
-            
-            for cmd, desc in dir_commands:
-                if not execute_command_with_logging(conn, cmd, description=desc):
-                    return False
-            
-            # Create test logs directory with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            test_logs_dir = f"/tmp/chukonu_test_logs_{timestamp}"
-            if not execute_command_with_logging(conn, f"mkdir -p {test_logs_dir}", 
-                                             description=f"Create test logs directory: {test_logs_dir}"):
+        )
+        
+        # Print connection info
+        console.print(f"\n[bold]Connected to [cyan]{node}[/cyan] as [cyan]{user}[/cyan][/bold]")
+        
+        # Set environment variables
+        console.print("\n[bold]Setting environment variables...[/bold]")
+        conn.config.run.env = {
+            'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-arm64',
+            'CHUKONU_HOME': '/root/chukonu/install',
+            'LD_LIBRARY_PATH': '/root/chukonu/install/lib:/tmp/cache',
+            'CHUKONU_TEMP': '/tmp',
+            'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+        }
+        print_success("Environment variables set")
+        
+        # Create necessary directories
+        console.print("\n[bold]Creating directories...[/bold]")
+        dir_commands = [
+            ("mkdir -p /tmp/staging /tmp/cache /root/chukonu/build /root/chukonu/install",
+             "Create base directories")
+        ]
+        
+        for cmd, desc in dir_commands:
+            if not execute_command_with_logging(conn, cmd, description=desc):
                 return False
+        
+        # Create test logs directory with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        test_logs_dir = f"/tmp/chukonu_test_logs_{timestamp}"
+        if not execute_command_with_logging(conn, f"mkdir -p {test_logs_dir}", 
+                                         description=f"Create test logs directory: {test_logs_dir}"):
+            return False
+        
+        # Build commands with descriptions
+        build_commands = [
+            # Build Scala components
+            ('cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt package',
+             "Build Scala package"),
             
-            # Build commands with descriptions
-            build_commands = [
-                # Build Scala components
-                ('cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt package',
-                 "Build Scala package"),
-                
-                ('cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt assembly',
-                 "Create Scala assembly JAR"),
-                
-                # Configure CMake
-                ('cd /root/chukonu/build && cmake .. -DCMAKE_BUILD_TYPE=Debug -DWITH_ASAN=OFF -DWITH_JEMALLOC=OFF -DCMAKE_INSTALL_PREFIX="$CHUKONU_HOME"',
-                 "Configure CMake build"),
-                
-                # Build and install
-                ('cd /root/chukonu/build && make install -j4',
-                 "Build and install Chukonu"),
-            ]
+            ('cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt assembly',
+             "Create Scala assembly JAR"),
             
-            # Execute build commands
-            console.print("\n[bold]Starting Chukonu build process...[/bold]")
-            for cmd, desc in build_commands:
-                if not execute_command_with_logging(conn, cmd, description=desc):
-                    print_error(f"Build failed during: {desc}")
-                    return False
+            # Configure CMake
+            ('cd /root/chukonu/build && cmake .. -DCMAKE_BUILD_TYPE=Debug -DWITH_ASAN=OFF -DWITH_JEMALLOC=OFF -DCMAKE_INSTALL_PREFIX="$CHUKONU_HOME"',
+             "Configure CMake build"),
             
-            # Run C++ tests
-            console.print("\n[bold]Running C++ tests...[/bold]")
-            ctest_log = f"{test_logs_dir}/ctest.log"
-            ctest_cmd = f'cd /root/chukonu/build && ctest --output-on-failure > {ctest_log} 2>&1'
-            
-            if not execute_command_with_logging(conn, ctest_cmd, 
-                                             log_file=ctest_log,
-                                             description="Run C++ tests"):
-                print_warning("Some C++ tests failed - check logs for details")
-            
-            # Run Scala tests
-            console.print("\n[bold]Running Scala tests...[/bold]")
-            sbt_log = f"{test_logs_dir}/sbt_test.log"
-            sbt_cmd = f'cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt test > {sbt_log} 2>&1'
-            
-            if not execute_command_with_logging(conn, sbt_cmd,
-                                             log_file=sbt_log,
-                                             description="Run Scala tests"):
-                print_warning("Some Scala tests failed - check logs for details")
-            
-            print_success(f"Chukonu build completed on {node}")
-            return True
-            
+            # Build and install
+            ('cd /root/chukonu/build && make install -j4',
+             "Build and install Chukonu"),
+        ]
+        
+        # Execute build commands
+        console.print("\n[bold]Starting Chukonu build process...[/bold]")
+        for cmd, desc in build_commands:
+            if not execute_command_with_logging(conn, cmd, description=desc):
+                print_error(f"Build failed during: {desc}")
+                return False
+        
+        # Run C++ tests
+        console.print("\n[bold]Running C++ tests...[/bold]")
+        ctest_log = f"{test_logs_dir}/ctest.log"
+        ctest_cmd = f'cd /root/chukonu/build && ctest --output-on-failure > {ctest_log} 2>&1'
+        
+        if not execute_command_with_logging(conn, ctest_cmd, 
+                                         log_file=ctest_log,
+                                         description="Run C++ tests"):
+            print_warning("Some C++ tests failed - check logs for details")
+        
+        # Run Scala tests
+        console.print("\n[bold]Running Scala tests...[/bold]")
+        sbt_log = f"{test_logs_dir}/sbt_test.log"
+        sbt_cmd = f'cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt test > {sbt_log} 2>&1'
+        
+        if not execute_command_with_logging(conn, sbt_cmd,
+                                         log_file=sbt_log,
+                                         description="Run Scala tests"):
+            print_warning("Some Scala tests failed - check logs for details")
+        
+        print_success(f"Chukonu build completed on {node}")
+        return True
+        
     except Exception as e:
         console.print_exception()
         return False
     finally:
-        try:
-            if conn is not None and conn.is_connected:
+        if conn is not None:
+            try:
                 if test_logs_dir:
-                    console.print("\n[bold]downloading logs...[/bold]")
+                    console.print("\n[bold]Downloading logs...[/bold]")
                     
                     # Compress logs
                     compress_cmd = f"tar -czf {test_logs_dir}.tar.gz -C {test_logs_dir} ."
@@ -234,11 +238,9 @@ def step_build_chukonu(node: str, initial_key_path: str, user: str, task_type: s
                             console.print("[yellow]⚠ Warning: Local log file not found after download[/yellow]")
                     except Exception as e:
                         console.print(f"[red]✗ Failed to download logs: {e}[/red]")
-        finally:
-            if conn is not None:
+            finally:
                 conn.close()
                 console.print("[dim]SSH connection closed[/dim]")
-
 def step_fetch_repo(node: str, initial_key_path: str, user: str, commit_id: str) -> bool:
     """Fetch and checkout the specified commit on the remote node"""
     print_step_header(f"Fetching repository on {node}")
