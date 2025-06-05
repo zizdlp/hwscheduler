@@ -277,6 +277,7 @@ def main():
     parser.add_argument('--instance-zone', help='可用区(如: cn-north-4a, 默认: <region>a)', default=None)
     parser.add_argument('--ami', help='镜像ID (如: CentOS 7.x)', default="04b5ea14-da35-47de-8467-66808dd62007")
     parser.add_argument('--key-pair', required=True, help='SSH密钥对名称')
+    parser.add_argument('--key-path', required=True, help='SSH key pair path')
     parser.add_argument('--security-group-id',required=True, help='安全组ID')
     parser.add_argument('--subnet-id',required=True, help='子网ID')
     parser.add_argument('--run-number', required=True, help='运行编号')
@@ -381,30 +382,6 @@ def main():
             f"{args.run_number}_{args.task_type}",
             created_instances_details
         )
-        initial_key_path="/root/schedule/KeyPair-loacl.pem"
-        # 配置SSH免密登录（仅在成功创建实例且有公网IP时）
-        # if args.use_ip and any(inst.get('public_ip', 'N/A') != 'N/A' for inst in created_instances_details):
-        #     console.rule("[bold blue]配置SSH免密登录[/bold blue]")
-            
-        #     # 获取初始SSH密钥路径（从参数或默认位置）
-        #     # initial_key_path = os.path.expanduser("~/.ssh/id_rsa")  # 默认使用用户的SSH密钥
-        #     # if args.key_pair:
-        #     #     # 如果是华为云的密钥对，可能需要从特定位置获取
-        #     #     initial_key_path = os.path.expanduser(f"~/.ssh/{args.key_pair}.pem")
-        #     initial_key_path="/root/schedule/KeyPair-loacl.pem"
-        #     # 配置免密登录
-        #     ssh_success = manager.ssh_configurator.configure_cluster_pwdless(
-        #         created_instances_details,
-        #         initial_key_path=initial_key_path,
-        #         user="root"
-        #     )
-            
-        #     if ssh_success:
-        #         console.print("[bold green]✓ SSH免密登录配置成功![/bold green]")
-        #     else:
-        #         console.print("[yellow]⚠ SSH免密登录配置部分失败[/yellow]")
-        
-        
         table = Table(title="已创建实例列表 (等待删除)", show_header=True, header_style="bold green")
         table.add_column("序号", style="dim", justify="right")
         table.add_column("名称")
@@ -422,8 +399,8 @@ def main():
                 inst['status']
             )
         console.print(table)
-        test_build_chukonu(created_instances_details[0]['public_ip'],initial_key_path,"root")
-        test_spark_base(created_instances_details[0]['public_ip'],initial_key_path,"root",args.task_type)
+        test_build_chukonu(created_instances_details[0]['public_ip'],args.key_path,"root")
+        test_spark_base(created_instances_details[0]['public_ip'],args.key_path,"root",args.task_type)
         
         server_ids_to_delete = [inst['id'] for inst in created_instances_details]
         eip_ids_to_delete = [inst['eip_id'] for inst in created_instances_details if inst.get('eip_id')]
