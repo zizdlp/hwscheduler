@@ -14,7 +14,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeEl
 from rich.table import Table
 from huaweicloudsdkecs.v2 import *
 from huaweicloudsdkeip.v2 import *
-from scheduler.huawei.ecs_manager import ECSInstanceManager,save_eips_to_file
+from hwscheduler.huawei.ecs_manager import ECSInstanceManager,save_eips_to_file
 console = Console()
 
 # 首先定义不同任务对应的命令模板
@@ -68,9 +68,9 @@ def get_test_command(task_name):
         return f'./dev/run-tests --parallelism 1 --modules {task_name}'
 
 
-def test_spark_base(node, initial_key_path, user,task_name):
+def test_spark_base(node, initial_key_path, user, task_name):
     """
-    Build and install Chukonu on the specified node
+    Build and install Chukonu on the specified node and collect test results
     """
     try:
         with Connection(
@@ -113,19 +113,11 @@ def test_spark_base(node, initial_key_path, user,task_name):
                     print(f"Check log file at {log_path}")
                     return False
             
-            # Run C++ tests with comprehensive logging
-            # Run C++ tests with comprehensive logging
+            # Run tests
             ctest_log = f"{test_logs_dir}/{task_name}.log"
             print(f"Running C++ tests on {node} and saving logs to {ctest_log}")
-
-            # First create an empty log file to ensure it exists
             conn.run(f"touch {ctest_log}")
 
-            # Run the command with proper output handling
-            # Using tee to capture output while still seeing it in real-time
-            # Using nohup to prevent hanging if the connection drops
-            
-            # 然后使用这个函数来构造命令
             test_command = get_test_command(task_name)
             result = conn.run(
                 f'cd /root/spark && bash -c "{test_command} > {ctest_log} 2>&1"',
@@ -135,46 +127,86 @@ def test_spark_base(node, initial_key_path, user,task_name):
             if not result.ok:
                 print(f"Warning: Command failed on {node}: {cmd}")
 
-            # Verify test results and print statistics
-            print(f"\nChecking test results in {ctest_log}...")
-
-            # Extract and print test statistics
-            stats_cmd = (
-                f"grep -E 'Total number of tests run:|Tests: succeeded|All tests passed' {ctest_log} || true"
-            )
-            stats_result = conn.run(stats_cmd, hide=True)
-
-            if not stats_result.stdout.strip():
-                print("No test statistics found in log file")
-                return False
-
-            # Print the statistics
-            print("\nTest Statistics:")
-            print(stats_result.stdout)
-
-            # Check for success conditions
-            success_check = conn.run(
-                f"grep -q 'All tests passed.' {ctest_log} && "
-                f"grep -q 'Tests: succeeded [0-9]+, failed 0, canceled 0, ignored [0-9]+, pending 0' {ctest_log} || true",
-                hide=True
-            )
-
-            # Compress test logs
-            conn.run(f"tar -czf {test_logs_dir}.tar.gz -C {test_logs_dir} .")
-            print(f"Test logs archived to: {test_logs_dir}.tar.gz")
+            # 分析日志文件并生成JSON
+            json_log = f"{test_logs_dir}/{task_name}.json"
+            awk_script = '''awk '
+                BEGIN {
+                  print "{";
+                  capture = 0;
+                }
+                /Tests:/ {
+                  match($0, /succeeded ([0-9]+), failed ([0-9]+), canceled ([0-9]+), ignored ([0-9]+), pending ([0-9]+)/, arr);
+                  print "  \\"succeeded\\": \\"" arr[1] "\\",";
+                  print "  \\"failed\\": \\"" arr[2] "\\",";
+                  print "  \\"canceled\\": \\"" arr[3] "\\",";
+                  print "  \\"ignored\\": \\"" arr[4] "\\",";
+                  print "  \\"pending\\": \\"" arr[5] "\\"";
+                }
+                END {
+                  print "}";
+                }
+            ' ''' + f"{ctest_log} > {json_log}"
             
-            # Download the log archive
+            conn.run(awk_script)
+            
+            # 收集测试结果文件 (TEST*.xml 和 hs_err*.log)
+            print("\nCollecting test result files...")
+            unitest_xml_dir = f"{test_logs_dir}/unitest_xml"
+            conn.run(f"mkdir -p {unitest_xml_dir}")
+            
+            # 使用find命令查找并复制测试结果文件
+            collect_cmd = f"""
+            TMP_DIR=$(mktemp -d)
+            sudo find /root/spark -type f \( \
+              -name 'TEST*.xml' \
+              -o -name 'hs_err*.log' \
+            \) -exec cp --parents {{}} "$TMP_DIR/" \;
+            
+            # 如果有文件被找到，打包它们
+            if [ "$(ls -A $TMP_DIR)" ]; then
+                tar -czf {unitest_xml_dir}/unitest_xml.tar.gz -C $TMP_DIR .
+            else
+                echo "No test result files found" > {unitest_xml_dir}/no_files_found.txt
+            fi
+            rm -rf $TMP_DIR
+            """
+            
+            conn.run(collect_cmd)
+            
+            # 下载文件到本地
             local_cache_dir = "./cache"
             os.makedirs(local_cache_dir, exist_ok=True)
+            
+            # 下载JSON结果
+            local_json_path = os.path.join(local_cache_dir, f"test_results_{task_name}_{timestamp}.json")
+            conn.get(json_log, local_json_path)
+            print(f"Downloaded test results JSON to: {local_json_path}")
+            
+            # 下载单元测试XML和错误日志
+            local_xml_path = os.path.join(local_cache_dir, f"unitest_xml_{task_name}_{timestamp}.tar.gz")
+            conn.get(f"{unitest_xml_dir}/unitest_xml.tar.gz", local_xml_path)
+            print(f"Downloaded unit test XML files to: {local_xml_path}")
+            
+            # 读取并打印JSON内容
+            json_result = conn.run(f"cat {json_log}", hide=True)
+            print("\nTest Results JSON:")
+            print(json_result.stdout)
+            
+            # Compress all test logs
+            conn.run(f"tar -czf {test_logs_dir}.tar.gz -C {test_logs_dir} .")
+            print(f"All test logs archived to: {test_logs_dir}.tar.gz")
+            
+            # Download the complete log archive
             local_log_path = os.path.join(local_cache_dir, f"chukonu_test_logs_{task_name}_{timestamp}.tar.gz")
             conn.get(f"{test_logs_dir}.tar.gz", local_log_path)
-            print(f"Downloaded test logs to: {local_log_path}")
+            print(f"Downloaded complete test logs to: {local_log_path}")
             
             return True
             
     except Exception as e:
         print(f"Error configuring master node in test_spark_base: {node}: {e}")
         return False
+
 def test_build_chukonu(node, initial_key_path, user):
     """
     Build and install Chukonu on the specified node

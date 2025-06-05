@@ -1,10 +1,10 @@
 # coding: utf-8
-from scheduler.huawei.eip_manager import create_eip
-from scheduler.huawei.saveInfo import save_info,cleanHostsBeforeInsert
-from scheduler.huawei.ecs_manager import parallel_create_instances
-from scheduler.huawei.saveInfo import printFile
+from hwscheduler.huawei.eip_manager import create_eip
+from hwscheduler.huawei.saveInfo import save_info,cleanHostsBeforeInsert
+from hwscheduler.huawei.ecs_manager import parallel_create_instances
+from hwscheduler.huawei.saveInfo import printFile
 import argparse
-from scheduler.huawei.config_pwdless import configure_pwdless
+from hwscheduler.huawei.config_pwdless import configure_pwdless
 from huaweicloudsdkecs.v2 import *
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='DEMO')

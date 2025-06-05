@@ -1,0 +1,54 @@
+name: Build and Publish Python Package
+
+on:
+  push:
+    tags:
+      - "v*"  # Trigger on tags like v1.0.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade build setuptools wheel
+          
+      - name: Build wheel package
+        run: python -m build --wheel --no-isolation --outdir dist/
+        
+      - name: Verify wheel
+        run: |
+          ls -la dist/
+          pip install dist/*.whl --force-reinstall
+          python -c "import hwscheduler; print(hwscheduler.__version__)"
+          
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-package
+          path: dist/*.whl
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Needed for OIDC auth with PyPI
+      contents: read
+      
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-package
+          path: dist
+          
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
