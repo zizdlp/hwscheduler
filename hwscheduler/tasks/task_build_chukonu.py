@@ -197,19 +197,6 @@ def step_build_chukonu(node: str, initial_key_path: str, user: str, task_type: s
                                              description="Run Scala tests"):
                 print_warning("Some Scala tests failed - check logs for details")
             
-            # Compress test logs
-            console.print("\n[bold]Archiving test logs...[/bold]")
-            archive_cmd = f"tar -czf {test_logs_dir}.tar.gz -C {test_logs_dir} ."
-            if not execute_command_with_logging(conn, archive_cmd,
-                                             description="Archive test logs"):
-                print_warning("Failed to archive test logs - continuing anyway")
-            
-            # Show log locations
-            console.print("\n[bold]Test log locations:[/bold]")
-            console.print(f"[cyan]• C++ tests:[/cyan] {ctest_log}")
-            console.print(f"[cyan]• Scala tests:[/cyan] {sbt_log}")
-            console.print(f"[cyan]• Archived logs:[/cyan] {test_logs_dir}.tar.gz")
-            
             print_success(f"Chukonu build completed on {node}")
             return True
             
