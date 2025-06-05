@@ -775,7 +775,7 @@ def main():
         return
 
     console.print(f"\n[bold green]总共 {len(created_instances_details)}/{args.num_instances} 个实例创建成功.[/bold green]")
-    
+    time.sleep(30)
     if len(created_instances_details) < args.num_instances:
         console.print(f"[yellow]注意: {args.num_instances - len(created_instances_details)} 个实例创建失败.[/yellow]")
 
