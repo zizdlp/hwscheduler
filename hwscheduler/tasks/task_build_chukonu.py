@@ -333,6 +333,7 @@ def step_fetch_repo(node: str, initial_key_path: str, user: str, commit_id: str)
     finally:
         if conn is not None:
             conn.close()
+
 def step_create_instances(manager: ECSInstanceManager, args) -> list:
     """Create ECS instances with progress tracking"""
     print_step_header(f"Creating {args.num_instances} instances")
