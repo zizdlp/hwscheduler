@@ -90,12 +90,14 @@ task_spark_base:
 		--use-ip true \
 		--task-name kubernetes
 login:
-	ssh -i ${HW_SDK_KEYPEM}.pem  root@119.8.237.137
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@119.8.236.221
+ 
 pwd_less:
 	python3 hw/config_pwdless.py --cluster-info "./cache/spark_nodes_info.txt"  --key_path ${HW_SDK_KEYPEM}.pem
 
 login_a:
-	ssh -i ${HW_SDK_KEYPEM}.pem  root@101.44.161.156
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@182.160.4.247
+
 
 delete_server:
 	python3 hw/deleteServer.py
@@ -153,7 +155,7 @@ build_chukonu:
 	python -m hwscheduler.tasks.task_build_chukonu  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
 	--security-group-id d73759f5-b103-4598-90c4-bfea079b89ac \
 	--subnet-id 5a6df451-8e78-46fa-be55-ae5752670b79 \
-	--ami ddd66165-da04-458e-bc1a-8fd83c4f4cfb \
+	--ami b0eedf9b-402c-4ad4-a266-ae4730aef840 \
 	--num-instances 1 --instance-type kc1.2xlarge.2 --key-pair ${HW_SDK_KEYPEM} --key-path /Users/zz/github/schedule/KeyPair-hk.pem  --run-number 1 --task-type build_chukonu --commit-id 3ee628983eb09307d1d65f3bf --actor zizdlp --use-ip
 test_spark_base:
 	python -m hwscheduler.tasks.task_spark_base2  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
