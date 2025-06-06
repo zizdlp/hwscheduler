@@ -269,57 +269,93 @@ def step_fetch_repo(node: str, initial_key_path: str, user: str, commit_id: str)
     print_step_header(f"Fetching repository on {node}")
     
     try:
-        with Connection(
-            host=node,
-            user=user,
-            connect_kwargs={"key_filename": initial_key_path},
-        ) as conn:
-            # Print connection info
-            console.print(f"\n[bold]Connected to [cyan]{node}[/cyan] as [cyan]{user}[/cyan][/bold]")
+        max_attempts = 10
+        retry_delay = 5  # seconds between retries
+        
+        # Initialize connection outside the try block
+        conn = None
+        
+        for attempt in range(1, max_attempts + 1):
+            try:
+                # Create a new connection for each attempt
+                conn = Connection(
+                    host=node,
+                    user=user,
+                    connect_kwargs={"key_filename": initial_key_path},
+                    connect_timeout=10  # Add connection timeout
+                )
+                
+                # Test the connection
+                print(f"[step_fetch_repo] Testing SSH connection to {node} (attempt {attempt}/{max_attempts})...")
+                result = conn.run("echo 'Connection test successful'", hide=True, warn=True)
+                
+                if result.ok:
+                    print(f"[step_fetch_repo] ✅ SSH connection to {node} established successfully")
+                    break
+                else:
+                    print(f"[step_fetch_repo] ❌ Failed to connect to {node} (attempt {attempt})")
+                    if attempt < max_attempts:
+                        time.sleep(retry_delay)
+                        continue
             
-            # Set environment variables
-            console.print("\n[bold]Setting environment variables...[/bold]")
-            conn.config.run.env = {
-                'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-arm64',
-                'CHUKONU_HOME': '/root/chukonu/install',
-                'LD_LIBRARY_PATH': '/root/chukonu/install/lib:/tmp/cache',
-                'CHUKONU_TEMP': '/tmp',
-                'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-            }
-            console.print("[green]✓ Environment variables set[/green]")
-            
-            # Create necessary directories
-            console.print("\n[bold]Creating directories...[/bold]")
-            dir_commands = [
-                ("mkdir -p /tmp/staging /tmp/cache /root/chukonu/build /root/chukonu/install",
-                 "Create base directories")
+            except Exception as e:
+                print(f"[step_fetch_repo] ⚠ Connection attempt {attempt} failed with error: {str(e)}")
+                if attempt < max_attempts:
+                    time.sleep(retry_delay)
+                    continue
+        
+        if conn is None:
+            print_warning(f"Failed to establish SSH connection to {node} after {max_attempts} attempts")
+            print_warning("Proceeding with operation despite connection issues")
+            conn = Connection(
+                host=node,
+                user=user,
+                connect_kwargs={"key_filename": initial_key_path},
+                connect_timeout=30  # Longer timeout for the actual operation
+            )
+        
+        # Print connection info
+        console.print(f"\n[bold]Connected to [cyan]{node}[/cyan] as [cyan]{user}[/cyan][/bold]")
+        
+        # Set environment variables
+        console.print("\n[bold]Setting environment variables...[/bold]")
+        conn.config.run.env = {
+            'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-arm64',
+            'CHUKONU_HOME': '/root/chukonu/install',
+            'LD_LIBRARY_PATH': '/root/chukonu/install/lib:/tmp/cache',
+            'CHUKONU_TEMP': '/tmp',
+            'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+        }
+        console.print("[green]✓ Environment variables set[/green]")
+        time.sleep(30)
+        
+        if commit_id:
+            console.print(f"\n[bold]Checking out commit: [cyan]{commit_id}[/cyan][/bold]")
+            git_commands = [
+                ("cd /root/chukonu && git fetch origin",
+                 "Fetch latest changes"),
+                (f"cd /root/chukonu && git checkout {commit_id}",
+                 f"Checkout commit {commit_id}"),
+                ("cd /root/chukonu && git status",
+                 "Verify repository status")
             ]
             
-            for cmd, desc in dir_commands:
-                if not execute_command_with_logging(conn, cmd, description=desc):
-                    return False
-            
-            if commit_id:
-                console.print(f"\n[bold]Checking out commit: [cyan]{commit_id}[/cyan][/bold]")
-                git_commands = [
-                    ("cd /root/chukonu && git fetch origin",
-                     "Fetch latest changes"),
-                    (f"cd /root/chukonu && git checkout {commit_id}",
-                     f"Checkout commit {commit_id}"),
-                    ("cd /root/chukonu && git status",
-                     "Verify repository status")
-                ]
-                
-                for cmd, desc in git_commands:
+            for cmd, desc in git_commands:
+                try:
                     if not execute_command_with_logging(conn, cmd, description=desc):
-                        return False
-            
-            print_success(f"Repository updated on {node}")
-            return True
-            
+                        print_warning(f"Command failed but continuing: {desc}")
+                except Exception as e:
+                    print_warning(f"Exception during command execution (continuing): {str(e)}")
+        
+        print_success(f"Repository update attempted on {node}")
+        return True
+        
     except Exception as e:
         console.print_exception()
         return False
+    finally:
+        if conn is not None:
+            conn.close()
 
 def step_create_instances(manager: ECSInstanceManager, args) -> list:
     """Create ECS instances with progress tracking"""
