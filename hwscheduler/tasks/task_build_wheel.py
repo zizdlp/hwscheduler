@@ -264,8 +264,9 @@ def step_build_wheel(node: str, initial_key_path: str, user: str, task_name: str
                 conn.close()
                 console.print("[dim]SSH connection closed[/dim]")
 
-def step_fetch_repo(node: str, initial_key_path: str, user: str, commit_id: str) -> bool:
-    """Fetch and checkout the specified commit on the remote node"""
+
+def step_fetch_repo(node: str, initial_key_path: str, user: str, commit_id: str = None, branch_name: str = None, tag: str = None) -> bool:
+    """Fetch and checkout the specified commit/tag/branch on the remote node (in order of priority: commit > tag > branch)"""
     print_step_header(f"Fetching repository on {node}")
     
     try:
@@ -327,25 +328,41 @@ def step_fetch_repo(node: str, initial_key_path: str, user: str, commit_id: str)
             'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
         }
         console.print("[green]✓ Environment variables set[/green]")
-        time.sleep(30)
         
+        # Always perform git pull first
+        console.print("\n[bold]Updating repository...[/bold]")
+        git_commands = [
+            ("cd /root/chukonu && git pull", "Pull latest changes from origin"),
+        ]
+        
+        # Add checkout command based on priority
         if commit_id:
-            console.print(f"\n[bold]Checking out commit: [cyan]{commit_id}[/cyan][/bold]")
-            git_commands = [
-                ("cd /root/chukonu && git fetch origin",
-                 "Fetch latest changes"),
-                (f"cd /root/chukonu && git checkout {commit_id}",
-                 f"Checkout commit {commit_id}"),
-                ("cd /root/chukonu && git status",
-                 "Verify repository status")
-            ]
-            
-            for cmd, desc in git_commands:
-                try:
-                    if not execute_command_with_logging(conn, cmd, description=desc):
-                        print_warning(f"Command failed but continuing: {desc}")
-                except Exception as e:
-                    print_warning(f"Exception during command execution (continuing): {str(e)}")
+            git_commands.extend([
+                (f"cd /root/chukonu && git checkout {commit_id}", f"Checkout commit {commit_id}"),
+            ])
+        elif tag:
+            git_commands.extend([
+                (f"cd /root/chukonu && git fetch --tags", "Fetch tags from remote"),
+                (f"cd /root/chukonu && git checkout tags/{tag}", f"Checkout tag {tag}"),
+            ])
+        elif branch_name:
+            git_commands.extend([
+                (f"cd /root/chukonu && git checkout {branch_name}", f"Checkout branch {branch_name}"),
+                ("cd /root/chukonu && git pull", "Pull latest changes for branch"),
+            ])
+        
+        # Always verify status
+        git_commands.append(
+            ("cd /root/chukonu && git status", "Verify repository status")
+        )
+        
+        # Execute all commands
+        for cmd, desc in git_commands:
+            try:
+                if not execute_command_with_logging(conn, cmd, description=desc):
+                    print_warning(f"Command failed but continuing: {desc}")
+            except Exception as e:
+                print_warning(f"Exception during command execution (continuing): {str(e)}")
         
         print_success(f"Repository update attempted on {node}")
         return True
@@ -356,6 +373,7 @@ def step_fetch_repo(node: str, initial_key_path: str, user: str, commit_id: str)
     finally:
         if conn is not None:
             conn.close()
+
 
 def step_create_instances(manager: ECSInstanceManager, args) -> list:
     """Create ECS instances with progress tracking"""
@@ -554,6 +572,8 @@ def main():
     parser.add_argument('--actor', required=True, help='Operator')
     parser.add_argument('--use-ip', action='store_true', help='Allocate public IP (default: false)', default=False)
     parser.add_argument('--commit-id', default="", help='Chukonu commit ID')
+    parser.add_argument('--tag', default="", help='Chukonu commit Tag')
+    parser.add_argument('--branch-name', default="", help='Chukonu commit branch')
     parser.add_argument('--bandwidth', type=int, default=5, help='EIP bandwidth (Mbps)')
     parser.add_argument('--script-path', required=True, help='build wheel sh')
     args = parser.parse_args()
@@ -592,7 +612,7 @@ def main():
         console.print(f"\n[bold]Using first instance: {first_instance['public_ip']}[/bold]")
         
         # Fetch repository
-        if not step_fetch_repo(first_instance['public_ip'], args.key_path, "root", args.commit_id):
+        if not step_fetch_repo(first_instance['public_ip'], args.key_path, "root", args.commit_id,args.branch_name,args.tag):
             console.print("[red]Aborting due to repository fetch failure[/red]")
             step_delete_resources(manager, created_instances, args)
             return

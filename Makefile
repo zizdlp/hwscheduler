@@ -148,9 +148,9 @@ parse:
 build_wheel:
 	python -m hwscheduler.tasks.task_build_wheel  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
 	--security-group-id d73759f5-b103-4598-90c4-bfea079b89ac  \
-	--subnet-id 5a6df451-8e78-46fa-be55-ae5752670b79 \
+	--subnet-id 5a6df451-8e78-46fa-be55-ae5752670b79 --tag v1.1.0 \
 	--ami 3ad925dc-ad8a-4b15-8fe9-63f2381d3d7a --script-path ./utils/build_wheel.sh \
-	--num-instances 1 --instance-type kc1.2xlarge.2 --key-pair ${HW_SDK_KEYPEM} --key-path /Users/zz/github/schedule/KeyPair-hk.pem  --run-number 1 --task-type build_wheel --commit-id 3ee628983eb09307d1d65f3bf --actor zizdlp --use-ip
+	--num-instances 1 --instance-type kc1.2xlarge.2 --key-pair ${HW_SDK_KEYPEM} --key-path /Users/zz/github/schedule/KeyPair-hk.pem  --run-number 1 --task-type build_wheel  --actor zizdlp --use-ip
 build_chukonu:
 	python -m hwscheduler.tasks.task_build_chukonu  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
 	--security-group-id d73759f5-b103-4598-90c4-bfea079b89ac \
