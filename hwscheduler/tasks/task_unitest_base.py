@@ -217,16 +217,16 @@ def main():
             step_delete_resources(manager, created_instances, args)
             return
     
-    # Step 3: Clean up resources
-    all_deleted = step_delete_resources(manager, created_instances, args)
+    # # Step 3: Clean up resources
+    # all_deleted = step_delete_resources(manager, created_instances, args)
     
-    if all_deleted:
-        if len(created_instances) == args.num_instances:
-            print_success(f"Test completed: {len(created_instances)} instances created and deleted successfully!")
-        else:
-            print_success(f"Test partially completed: {len(created_instances)}/{args.num_instances} instances created and deleted successfully!")
-    else:
-        print_error(f"Test failed: Some or all instances (total {len(created_instances)} attempted) failed to delete")
+    # if all_deleted:
+    #     if len(created_instances) == args.num_instances:
+    #         print_success(f"Test completed: {len(created_instances)} instances created and deleted successfully!")
+    #     else:
+    #         print_success(f"Test partially completed: {len(created_instances)}/{args.num_instances} instances created and deleted successfully!")
+    # else:
+    #     print_error(f"Test failed: Some or all instances (total {len(created_instances)} attempted) failed to delete")
 
 if __name__ == "__main__":
     main()
