@@ -157,6 +157,13 @@ build_chukonu:
 	--subnet-id 5a6df451-8e78-46fa-be55-ae5752670b79 \
 	--ami b0eedf9b-402c-4ad4-a266-ae4730aef840 \
 	--num-instances 1 --instance-type kc1.2xlarge.2 --key-pair ${HW_SDK_KEYPEM} --key-path /Users/zz/github/schedule/KeyPair-hk.pem  --run-number 1 --task-type build_chukonu --commit-id 3ee628983eb09307d1d65f3bf --actor zizdlp --use-ip
+unitest_base:
+	python -m hwscheduler.tasks.task_unitest_base  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
+	--security-group-id d73759f5-b103-4598-90c4-bfea079b89ac  \
+	--subnet-id 5a6df451-8e78-46fa-be55-ae5752670b79 --tag v1.1.0 \
+	--ami 3ad925dc-ad8a-4b15-8fe9-63f2381d3d7a --script-path ./utils/test_spark.sh \
+	--num-instances 1 --instance-type kc1.2xlarge.2 --key-pair ${HW_SDK_KEYPEM} --key-path /Users/zz/github/schedule/KeyPair-hk.pem  --run-number 1 --task-type yarn  --actor zizdlp --use-ip
+
 test_spark_base:
 	python -m hwscheduler.tasks.task_spark_base2  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
 		--security-group-id 6308b01a-0e7a-413a-96e2-07a3e507c324 \
