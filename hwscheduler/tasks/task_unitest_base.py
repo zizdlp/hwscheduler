@@ -62,7 +62,12 @@ def step_unitest_base(node: str, initial_key_path: str, user: str, task_name: st
             ("mkdir -p /tmp/staging /tmp/cache /root/chukonu/build /root/chukonu/install",
              "Create base directories"),
             (f"mkdir -p /tmp/chukonu_spark_test_logs_{timestamp}",
-             "Create logs directory")
+             "Create logs directory"),
+            ('cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt package',"sbt package"),
+            ('cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt assembly',"sbt assembly"),
+            ('cd /root/chukonu/build && cmake .. -DCMAKE_BUILD_TYPE=Debug -DWITH_ASAN=OFF -DWITH_JEMALLOC=OFF -DCMAKE_INSTALL_PREFIX="$CHUKONU_HOME"',"build chukonu"),
+            ('cd /root/chukonu/build && make install -j4',"build && install chukonu"),
+            ('cd /root/spark && ./dev/run-tests --parallelism 1 --modules hive --included-tags "org.apache.spark.tags.HivePartOneTest,org.apache.spark.tags.HivePartTwoTest"',"run spark unitest")
         ]
         
         for cmd, desc in dir_commands:
