@@ -46,9 +46,9 @@ if [[ $PARAM == asan-* ]]; then
 else
   echo "Parameter does not start with 'asan-'. Proceeding without asan-specific settings."
   # 在这里添加非 "asan-" 开头时的逻辑
-  export LD_PRELOAD=/lib/x86_64-linux-gnu/libjemalloc.so.2:/opt/chukonu_install/lib/libchukonu_preloaded.so
+  export LD_PRELOAD=/lib/aarch64-linux-gnu/libjemalloc.so.2:/root/chukonu/install/lib/libchukonu_preloaded.so
   export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${JAVA_HOME}/lib
-  export LD_LIBRARY_PATH=/opt/chukonu_install/lib:${LD_LIBRARY_PATH}:/opt/cache
+  export LD_LIBRARY_PATH=/root/chukonu/install/lib:${LD_LIBRARY_PATH}:/tmp/cache
 fi
 
 
