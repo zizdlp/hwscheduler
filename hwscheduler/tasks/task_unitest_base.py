@@ -67,7 +67,6 @@ def step_unitest_base(node: str, initial_key_path: str, user: str, task_name: st
             ('cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt assembly',"sbt assembly"),
             ('cd /root/chukonu/build && cmake .. -DCMAKE_BUILD_TYPE=Debug -DWITH_ASAN=OFF -DWITH_JEMALLOC=OFF -DCMAKE_INSTALL_PREFIX="$CHUKONU_HOME"',"build chukonu"),
             ('cd /root/chukonu/build && make install -j4',"build && install chukonu"),
-            ('cd /root/spark && ./dev/run-tests --parallelism 1 --modules hive --included-tags "org.apache.spark.tags.HivePartOneTest,org.apache.spark.tags.HivePartTwoTest"',"run spark unitest")
         ]
         
         for cmd, desc in dir_commands:
@@ -88,12 +87,12 @@ def step_unitest_base(node: str, initial_key_path: str, user: str, task_name: st
             return False
             
         try:
-            conn.put(script_path, "/root/unitest_spark.sh")
+            conn.put(script_path, "/root/spark/unitest_spark.sh")
             console.print("[green]✓ Build script uploaded successfully[/green]")
             
             # Verify file exists
             if not execute_command_with_logging(conn,
-                                              "test -f /root/unitest_spark.sh",
+                                              f"test -f /root/unitest_spark.sh {task_name}",
                                               description="Verify build script exists"):
                 return False
         except Exception as e:
@@ -222,16 +221,16 @@ def main():
             step_delete_resources(manager, created_instances, args)
             return
     
-    # # Step 3: Clean up resources
-    # all_deleted = step_delete_resources(manager, created_instances, args)
+    # Step 3: Clean up resources
+    all_deleted = step_delete_resources(manager, created_instances, args)
     
-    # if all_deleted:
-    #     if len(created_instances) == args.num_instances:
-    #         print_success(f"Test completed: {len(created_instances)} instances created and deleted successfully!")
-    #     else:
-    #         print_success(f"Test partially completed: {len(created_instances)}/{args.num_instances} instances created and deleted successfully!")
-    # else:
-    #     print_error(f"Test failed: Some or all instances (total {len(created_instances)} attempted) failed to delete")
+    if all_deleted:
+        if len(created_instances) == args.num_instances:
+            print_success(f"Test completed: {len(created_instances)} instances created and deleted successfully!")
+        else:
+            print_success(f"Test partially completed: {len(created_instances)}/{args.num_instances} instances created and deleted successfully!")
+    else:
+        print_error(f"Test failed: Some or all instances (total {len(created_instances)} attempted) failed to delete")
 
 if __name__ == "__main__":
     main()
