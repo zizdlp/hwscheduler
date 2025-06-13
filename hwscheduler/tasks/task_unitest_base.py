@@ -92,12 +92,33 @@ def step_unitest_base(node: str, initial_key_path: str, user: str, task_name: st
             
             # Verify file exists
             if not execute_command_with_logging(conn,
-                                              f"test -f /root/unitest_spark.sh {task_name}",
+                                              f"test -f /root/spark/unitest_spark.sh",
                                               description="Verify build script exists"):
                 return False
         except Exception as e:
             console.print(f"[red]✗ Failed to upload build script: {e}[/red]")
             return False
+        
+        # Build commands with logging
+        console.print("\n[bold]Starting test process...[/bold]")
+        build_commands = [
+            (f"chmod +x /root/spark/unitest_spark.sh",
+             "Make build script executable",
+             f"{test_logs_dir}/chmod.log"),
+             
+            (f"bash /root/spark/unitest_spark.sh > {test_logs_dir}/unitest_base.log 2>&1",
+             "unitest base",
+             f"{test_logs_dir}/unitest_base.log")
+        ]
+        
+        for cmd, desc, log_file in build_commands:
+            if not execute_command_with_logging(conn, cmd, log_file, description=desc):
+                success = False
+                break
+        
+        if not success:
+            return False
+        
 
         print_success(f"spark unitest {task_name} successfully on {node}")
         return True
