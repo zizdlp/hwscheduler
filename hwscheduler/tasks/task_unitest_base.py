@@ -106,7 +106,7 @@ def step_unitest_base(node: str, initial_key_path: str, user: str, task_name: st
              "Make build script executable",
              f"{test_logs_dir}/chmod.log"),
              
-            (f"bash /root/spark/unitest_spark.sh > {test_logs_dir}/unitest_base.log 2>&1",
+            (f"cd /root/spark && bash unitest_spark.sh {task_name} > {test_logs_dir}/unitest_base.log 2>&1",
              "unitest base",
              f"{test_logs_dir}/unitest_base.log")
         ]
