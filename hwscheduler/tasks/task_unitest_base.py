@@ -109,9 +109,9 @@ def step_unitest_base(node: str, initial_key_path: str, user: str, task_name: st
              "Make build script executable",
              f"{test_logs_dir}/chmod.log"),
              
-            (f"cd /root/spark && bash unitest_spark.sh {task_name} > {test_logs_dir}/unitest_base.log 2>&1",
-             "unitest base",
-             f"{test_logs_dir}/unitest_base.log")
+            # (f"cd /root/spark && bash unitest_spark.sh {task_name} > {test_logs_dir}/unitest_base.log 2>&1",
+            #  "unitest base",
+            #  f"{test_logs_dir}/unitest_base.log")
         ]
         
         for cmd, desc, log_file in build_commands:
@@ -121,7 +121,88 @@ def step_unitest_base(node: str, initial_key_path: str, user: str, task_name: st
         
         if not success:
             return False
+        result = conn.run(
+            f'cd /root/spark && bash unitest_spark.sh {task_name} > {test_logs_dir}/unitest_base.log 2>&1',
+            warn=True
+        )
         
+        if not result.ok:
+            print(f"Warning: Command failed on {node}: {cmd}")
+
+        # 分析日志文件并生成JSON
+        json_log = f"{test_logs_dir}/{task_name}.json"
+        awk_script = '''awk '
+            BEGIN {
+                print "{";
+                capture = 0;
+            }
+            /Tests:/ {
+                match($0, /succeeded ([0-9]+), failed ([0-9]+), canceled ([0-9]+), ignored ([0-9]+), pending ([0-9]+)/, arr);
+                print "  \\"succeeded\\": \\"" arr[1] "\\",";
+                print "  \\"failed\\": \\"" arr[2] "\\",";
+                print "  \\"canceled\\": \\"" arr[3] "\\",";
+                print "  \\"ignored\\": \\"" arr[4] "\\",";
+                print "  \\"pending\\": \\"" arr[5] "\\"";
+            }
+            END {
+                print "}";
+            }
+        ' ''' + f"{test_logs_dir}/unitest_base.log > {json_log}"
+        
+        conn.run(awk_script)
+    
+        # 收集测试结果文件 (TEST*.xml 和 hs_err*.log)
+        print("\nCollecting test result files...")
+        unitest_xml_dir = f"{test_logs_dir}/unitest_xml"
+        conn.run(f"mkdir -p {unitest_xml_dir}")
+        
+        # 使用find命令查找并复制测试结果文件
+        collect_cmd = f"""
+        TMP_DIR=$(mktemp -d)
+        sudo find /root/spark -type f \( \
+            -name 'TEST*.xml' \
+            -o -name 'hs_err*.log' \
+        \) -exec cp --parents {{}} "$TMP_DIR/" \;
+        
+        # 如果有文件被找到，打包它们
+        if [ "$(ls -A $TMP_DIR)" ]; then
+            tar -czf {unitest_xml_dir}/unitest_xml.tar.gz -C $TMP_DIR .
+        else
+            echo "No test result files found" > {unitest_xml_dir}/no_files_found.txt
+        fi
+        rm -rf $TMP_DIR
+        """
+        
+        conn.run(collect_cmd)
+
+        # 下载文件到本地
+        local_cache_dir = "./cache"
+        os.makedirs(local_cache_dir, exist_ok=True)
+        
+        # 下载JSON结果
+        local_json_path = os.path.join(local_cache_dir, f"test_results_{task_name}_{timestamp}.json")
+        conn.get(json_log, local_json_path)
+        print(f"Downloaded test results JSON to: {local_json_path}")
+        
+        # 下载单元测试XML和错误日志
+        local_xml_path = os.path.join(local_cache_dir, f"unitest_xml_{task_name}_{timestamp}.tar.gz")
+        conn.get(f"{unitest_xml_dir}/unitest_xml.tar.gz", local_xml_path)
+        print(f"Downloaded unit test XML files to: {local_xml_path}")
+        
+        # 读取并打印JSON内容
+        json_result = conn.run(f"cat {json_log}", hide=True)
+        print("\nTest Results JSON:")
+        print(json_result.stdout)
+        
+        # Compress all test logs
+        conn.run(f"tar -czf {test_logs_dir}.tar.gz -C {test_logs_dir} .")
+        print(f"All test logs archived to: {test_logs_dir}.tar.gz")
+        
+        # Download the complete log archive
+        local_log_path = os.path.join(local_cache_dir, f"chukonu_test_logs_{task_name}_{timestamp}.tar.gz")
+        conn.get(f"{test_logs_dir}.tar.gz", local_log_path)
+        print(f"Downloaded complete test logs to: {local_log_path}")
+
 
         print_success(f"spark unitest {task_name} successfully on {node}")
         return True
