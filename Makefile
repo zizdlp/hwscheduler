@@ -159,5 +159,5 @@ unitest_base:
 	python -m hwscheduler.tasks.task_unitest_base  --ak ${HW_SDK_AK} --sk ${HW_SDK_SK} --region ${HW_SDK_REGION} --vpc-id ${HW_SDK_VPCID} \
 	--security-group-id d73759f5-b103-4598-90c4-bfea079b89ac  \
 	--subnet-id 5a6df451-8e78-46fa-be55-ae5752670b79 \
-	--ami b0eedf9b-402c-4ad4-a266-ae4730aef840 --script-path ./utils/test_spark.sh \
+	--ami 89da185e-efa5-4292-bcae-c103e8730ac5 --script-path ./utils/test_spark.sh \
 	--num-instances 1 --timeout-hours 6 --instance-type kc1.2xlarge.2 --key-pair ${HW_SDK_KEYPEM} --key-path /Users/zz/github/schedule/KeyPair-hk.pem  --run-number 1 --task-type yarn  --actor zizdlp --use-ip
