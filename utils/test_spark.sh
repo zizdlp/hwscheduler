@@ -22,9 +22,9 @@ export SPARK_LOCAL_IP=localhost
 export SKIP_UNIDOC=true
 export SKIP_MIMA=true
 export SKIP_PACKAGING=true
-export CHUKONU_HOME=/opt/chukonu_install
-export CHUKONU_TEMP=/opt
-export LD_LIBRARY_PATH=$CHUKONU_TEMP/cache:$CHUKONU_HOME/lib
+export CHUKONU_HOME=/root/chukonu/install
+export CHUKONU_TEMP=/tmp
+export LD_LIBRARY_PATH=/root/chukonu/install/lib:/tmp/cache
 
 
 
@@ -128,7 +128,7 @@ case $PARAM in
     ;;
 esac
 
-CMD='./build/sbt -Phive "hive/testOnly *HiveWindowFunctionQuerySuite"'
+# CMD='./build/sbt -Phive "hive/testOnly *HiveWindowFunctionQuerySuite"'
 # 执行命令
 echo "Running command: $CMD"
 eval $CMD

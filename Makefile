@@ -90,14 +90,11 @@ task_spark_base:
 		--use-ip true \
 		--task-name kubernetes
 login:
-	ssh -i ${HW_SDK_KEYPEM}.pem  root@119.13.85.61
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@189.1.221.86
  
  
 pwd_less:
 	python3 hw/config_pwdless.py --cluster-info "./cache/spark_nodes_info.txt"  --key_path ${HW_SDK_KEYPEM}.pem
-
-login_a:
-	ssh -i ${HW_SDK_KEYPEM}.pem  root@119.13.85.61
 
 
 delete_server:

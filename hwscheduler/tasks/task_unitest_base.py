@@ -67,6 +67,9 @@ def step_unitest_base(node: str, initial_key_path: str, user: str, task_name: st
             ('cd /root/chukonu/scala && ~/.local/share/coursier/bin/sbt assembly',"sbt assembly"),
             ('cd /root/chukonu/build && cmake .. -DCMAKE_BUILD_TYPE=Debug -DWITH_ASAN=OFF -DWITH_JEMALLOC=OFF -DCMAKE_INSTALL_PREFIX="$CHUKONU_HOME"',"build chukonu"),
             ('cd /root/chukonu/build && make install -j4',"build && install chukonu"),
+            ('cd /root/spark && ~/.local/share/coursier/bin/sbt package', 'sbt_build'),
+            ('cd /root/spark/python && python3 setup.py sdist', 'pyspark_build'),
+            ('cd /root/spark/python && pip install dist/pyspark-3.4.4.dev0.tar.gz', 'pyspark_install')
         ]
         
         for cmd, desc in dir_commands:
@@ -239,19 +242,19 @@ def main():
         # Build wheel
         if not step_unitest_base(first_instance['public_ip'], args.key_path, "root", args.task_type,args.script_path):
             console.print("[red]Aborting due to build failure[/red]")
-            step_delete_resources(manager, created_instances, args)
+            # step_delete_resources(manager, created_instances, args)
             return
     
-    # Step 3: Clean up resources
-    all_deleted = step_delete_resources(manager, created_instances, args)
+    # # Step 3: Clean up resources
+    # all_deleted = step_delete_resources(manager, created_instances, args)
     
-    if all_deleted:
-        if len(created_instances) == args.num_instances:
-            print_success(f"Test completed: {len(created_instances)} instances created and deleted successfully!")
-        else:
-            print_success(f"Test partially completed: {len(created_instances)}/{args.num_instances} instances created and deleted successfully!")
-    else:
-        print_error(f"Test failed: Some or all instances (total {len(created_instances)} attempted) failed to delete")
+    # if all_deleted:
+    #     if len(created_instances) == args.num_instances:
+    #         print_success(f"Test completed: {len(created_instances)} instances created and deleted successfully!")
+    #     else:
+    #         print_success(f"Test partially completed: {len(created_instances)}/{args.num_instances} instances created and deleted successfully!")
+    # else:
+    #     print_error(f"Test failed: Some or all instances (total {len(created_instances)} attempted) failed to delete")
 
 if __name__ == "__main__":
     main()
