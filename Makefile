@@ -97,7 +97,7 @@ pwd_less:
 	python3 hw/config_pwdless.py --cluster-info "./cache/spark_nodes_info.txt"  --key_path ${HW_SDK_KEYPEM}.pem
 
 login_a:
-	ssh -i ${HW_SDK_KEYPEM}.pem  root@182.160.4.247
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@119.13.85.61
 
 
 delete_server:
