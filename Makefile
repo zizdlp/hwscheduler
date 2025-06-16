@@ -90,7 +90,7 @@ task_spark_base:
 		--use-ip true \
 		--task-name kubernetes
 login:
-	ssh -i ${HW_SDK_KEYPEM}.pem  root@94.74.102.35
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@189.1.221.86
  
  
 pwd_less:
@@ -160,4 +160,4 @@ unitest_base:
 	--security-group-id d73759f5-b103-4598-90c4-bfea079b89ac  \
 	--subnet-id 5a6df451-8e78-46fa-be55-ae5752670b79 \
 	--ami 89da185e-efa5-4292-bcae-c103e8730ac5 --script-path ./utils/test_spark.sh \
-	--num-instances 1 --timeout-hours 6 --instance-type kc1.2xlarge.2 --key-pair ${HW_SDK_KEYPEM} --key-path /Users/zz/github/schedule/KeyPair-hk.pem  --run-number 1 --task-type yarn  --actor zizdlp --use-ip
+	--num-instances 1 --timeout-hours 6 --instance-type kc1.4xlarge.2	 --key-pair ${HW_SDK_KEYPEM} --key-path /Users/zz/github/schedule/KeyPair-hk.pem  --run-number 1 --task-type yarn  --actor zizdlp --use-ip
