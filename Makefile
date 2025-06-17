@@ -90,7 +90,7 @@ task_spark_base:
 		--use-ip true \
 		--task-name kubernetes
 login:
-	ssh -i ${HW_SDK_KEYPEM}.pem  root@189.1.221.86
+	ssh -i ${HW_SDK_KEYPEM}.pem  root@183.87.43.15
  
  
 pwd_less:

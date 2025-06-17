@@ -30,7 +30,6 @@ cd build && ctest
 cd scala && ~/.local/share/coursier/bin/sbt test
 ```
 
-
 ```
 curl -X POST \
   -H "Authorization: token ${github_token}" \
@@ -40,4 +39,6 @@ curl -X POST \
 
 |name|result|
 
-
+```ssh
+ ./build/sbt -Phive "hive/testOnly *HiveWindowFunctionQuerySuite -- -z \"windowing_udaf.q (deterministic)\""
+```

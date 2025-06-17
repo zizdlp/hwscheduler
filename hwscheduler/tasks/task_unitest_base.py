@@ -327,7 +327,7 @@ def main():
             return
     
     # Step 3: Clean up resources
-    all_deleted = step_delete_resources(manager, created_instances, args)
+    # all_deleted = step_delete_resources(manager, created_instances, args)
     
     # if all_deleted:
     #     if len(created_instances) == args.num_instances:
