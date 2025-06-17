@@ -128,7 +128,7 @@ case $PARAM in
     ;;
 esac
 
-# CMD='./build/sbt -Phive "hive/testOnly *HiveWindowFunctionQuerySuite"'
+CMD='./build/sbt -Phive "hive/testOnly *HiveWindowFunctionQuerySuite"'
 # 执行命令
 echo "Running command: $CMD"
 eval $CMD
