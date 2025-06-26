@@ -1,6 +1,8 @@
 #!/bin/bash
 export JAVA_HOME="/root/jdk-11.0.27+6"
 export PATH=$JAVA_HOME/bin:$PATH
+yum install -y epel-release
+yum install -y jemalloc jemalloc-devel
 cd /io/chukonu/scala && /root/sbt/bin/sbt package
 cd /io/chukonu/scala && /root/sbt/bin/sbt assembly
 cd /io/chukonu && sed -i 's/find_package(Python REQUIRED COMPONENTS Interpreter Development)/#find_package(Python REQUIRED COMPONENTS Interpreter Development)/g' CMakeLists.txt
