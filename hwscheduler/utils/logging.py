@@ -167,7 +167,7 @@ def step_fetch_repo(node: str, initial_key_path: str, user: str, commit_id: str 
         # Always perform git pull first
         console.print("\n[bold]Updating repository...[/bold]")
         git_commands = [
-            ("cd /root/chukonu && git pull && git checkout main", "Pull latest changes from origin"),
+            ("cd /root/chukonu && git pull && git submodule update --init --recursive && git checkout main", "Pull latest changes from origin"),
         ]
         
         # Add checkout command based on priority

@@ -24,7 +24,7 @@ export CHUKONU_TEMP=/tmp
 cd scala && sbt package
 cd scala && sbt assembly
 mkdir build && mkdir /tmp/cache && mkdir /tmp/staging
-cd build && cmake .. -DCMAKE_BUILD_TYPE=Debug -DWITH_ASAN=OFF -DWITH_JEMALLOC=OFF -DCMAKE_INSTALL_PREFIX="$CHUKONU_HOME"
+cd build && cmake .. -DCMAKE_BUILD_TYPE=Debug -DWITH_ASAN=OFF -DWITH_JEMALLOC=OFF     -DCMAKE_CXX_FLAGS="-fsigned-char" -DCMAKE_C_FLAGS="-fsigned-char" -DCMAKE_INSTALL_PREFIX="$CHUKONU_HOME"
 cd build && make install
 cd build && ctest
 cd scala && ~/.local/share/coursier/bin/sbt test
