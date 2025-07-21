@@ -164,3 +164,8 @@ unitest_base:
 	--num-instances 1 --timeout-hours 7 --instance-type kc1.4xlarge.2	 --key-pair ${HW_SDK_KEYPEM} --key-path /Users/zz/github/schedule/KeyPair-hk.pem  --run-number 1 --task-type yarn  --actor zizdlp --use-ip
 cplog:
 	scp -i ${HW_SDK_KEYPEM}.pem root@189.1.240.235:"/root/spark/sql/hive/target/test-reports/TEST-org.apache.spark.sql.hive.execution.HiveWindowFunctionQuerySuite.xml" ./.
+login_ali:
+	ssh -i /Users/zz/github/schedule/security.pem  root@120.25.211.218
+
+upload:
+	scp -i /Users/zz/github/schedule/security.pem   chukonu-1.1.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.zip root@120.25.211.218:/root/

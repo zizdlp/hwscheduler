@@ -184,6 +184,7 @@ def step_fetch_repo(node: str, initial_key_path: str, user: str, commit_id: str 
             git_commands.extend([
                 (f"cd /root/chukonu && git checkout {branch_name}", f"Checkout branch {branch_name}"),
                 ("cd /root/chukonu && git pull", "Pull latest changes for branch"),
+                ("cd /root/chukonu && git submodule update --init --recursive", "submodule update for branch"),
             ])
         
         # Always verify status
